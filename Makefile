@@ -1,9 +1,17 @@
 CC=g++
-CFLAGS=-g -I.
-arc: arc.o
-	#$(CC) -o arc arc.o $(CFLAGS)
-	$(CC) -std=c++14 arc.o -o arc
+CFLAGS=-g -c -Wall -std=c++14
+LDFLAGS=
+SOURCES=arc.cpp
+OBJECTS=$(SOURCES:.cpp=.o)
+EXECUTABLE=arc
 
-arc.o: arc.cpp
-	$(CC) -c -std=c++14 arc.cpp
+all: $(SOURCES) $(EXECUTABLE)
 
+$(EXECUTABLE): $(OBJECTS)
+	$(CC) $(LDFLAGS) $(OBJECTS) -o $@
+
+.cpp.o:
+	$(CC) $(CFLAGS) $< -o $@
+
+clean:
+	rm *.o arc
