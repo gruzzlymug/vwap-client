@@ -1,9 +1,9 @@
 CC=g++
 CFLAGS=-g -c -Wall -std=c++14
 LDFLAGS=
-SOURCES=arc.cpp
+SOURCES=client.cpp
 OBJECTS=$(SOURCES:.cpp=.o)
-EXECUTABLE=arc
+EXECUTABLE=client
 
 all: $(SOURCES) $(EXECUTABLE)
 
@@ -14,4 +14,4 @@ $(EXECUTABLE): $(OBJECTS)
 	$(CC) $(CFLAGS) $< -o $@
 
 clean:
-	rm *.o arc
+	rm *.o client
