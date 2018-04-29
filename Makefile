@@ -1,9 +1,9 @@
 CC=g++
 CFLAGS=-g -c -Wall -std=c++14
 LDFLAGS=
-CLIENT_SOURCES=client.cpp
+CLIENT_SOURCES=start_client.cpp client.cpp
 CLIENT_OBJECTS=$(CLIENT_SOURCES:.cpp=.o)
-CLIENT_EXECUTABLE=client
+CLIENT_EXECUTABLE=start_client
 
 SERVER_SOURCES=server.cpp
 SERVER_OBJECTS=$(SERVER_SOURCES:.cpp=.o)
@@ -21,4 +21,4 @@ $(SERVER_EXECUTABLE): $(SERVER_OBJECTS)
 	$(CC) $(CFLAGS) $< -o $@
 
 clean:
-	rm *.o client server
+	rm *.o $(CLIENT_EXECUTABLE) $(SERVER_EXECUTABLE)

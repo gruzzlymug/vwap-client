@@ -1,3 +1,7 @@
+#pragma once
+
+#include <netinet/in.h>
+
 class Client {
 	int sockfd;
 	struct sockaddr_in serv_addr;
