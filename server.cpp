@@ -6,19 +6,103 @@
 #include <netinet/in.h>
 #include <signal.h>
 
-void dostuff(int newsockfd);
+// TODO ? perror followed by exit(1);
+class Server {
+	int sockfd;
+	bool done;
 
-void error(const char *msg)
-{
-	perror(msg);
-	exit(1);
+	void dostuff(int newsockfd);
+
+public:
+	Server();
+	~Server();
+
+	void connect(int port);
+	void listen();
+
+	void stop();
+};
+
+Server::Server()
+	: sockfd(-1), done(false) {
+	signal(SIGCHLD, SIG_IGN);
 }
 
-bool done = false;
+Server::~Server() {
+	close(sockfd);
+}
+
+void Server::connect(int port) {
+	sockfd = socket(AF_INET, SOCK_STREAM, 0);
+	if (sockfd < 0) {
+		perror("ERROR opening socket");
+		return;
+	}
+
+	struct sockaddr_in serv_addr;
+	bzero((char *) &serv_addr, sizeof(serv_addr));
+	serv_addr.sin_family = AF_INET;
+	serv_addr.sin_addr.s_addr = INADDR_ANY;
+	serv_addr.sin_port = htons(port);
+	if (bind(sockfd, (struct sockaddr *) &serv_addr, sizeof(serv_addr)) < 0) {
+		perror("ERROR on binding");
+		return;
+	}
+	::listen(sockfd, 5);
+}
+
+void Server::listen() {
+	struct sockaddr_in cli_addr;
+	socklen_t clilen = sizeof(cli_addr);
+
+	while (!done) {
+		int newsockfd = accept(sockfd, (struct sockaddr *) &cli_addr, &clilen);
+		if (newsockfd < 0) {
+			perror("ERROR on accept");
+			return;
+		}
+		printf("-\n");
+		int pid = fork();
+		if (pid < 0) {
+			perror("ERROR on fork");
+			return;
+		}
+		if (pid == 0) {
+			close(sockfd);
+			dostuff(newsockfd);
+			exit(0);
+		} else {
+			close(newsockfd);
+		}
+	}
+}
+
+void Server::stop() {
+	done = true;
+}
+
+void Server::dostuff(int newsockfd) {
+	char buffer[256];
+	bzero(buffer, 256);
+
+	int n = read(newsockfd, buffer, 255);
+	if (n < 0) {
+		perror("ERROR reading from socket");
+	}
+
+	printf("Here is the message: %s\n", buffer);
+	n = write(newsockfd, "Received", sizeof("Received"));
+	if (n < 0) {
+		perror("ERROR writing to socket");
+	}
+
+	// TODO use goto to get here from errors?
+	// TODO track orphaned socket if returning
+	close(newsockfd);
+}
 
 void int_handler(int s) {
-	printf("Caught signal %d\n",s);
-	done = true;
+	printf("Caught signal %d!!!\n",s);
 }
 
 int main(int argc, char** argv) {
@@ -32,68 +116,15 @@ int main(int argc, char** argv) {
 	sigemptyset(&sig_int_handler.sa_mask);
 	sig_int_handler.sa_flags = 0;
 
-	sigaction(SIGINT, &sig_int_handler, NULL);
+	//sigaction(SIGINT, &sig_int_handler, NULL);
 
-	signal(SIGCHLD, SIG_IGN);
+	Server server;
 
-	int sockfd = socket(AF_INET, SOCK_STREAM, 0);
-	if (sockfd < 0) {
-		error("ERROR opening socket");
-	}
-
-	struct sockaddr_in serv_addr;
-	bzero((char *) &serv_addr, sizeof(serv_addr));
 	int portno = atoi(argv[1]);
-	serv_addr.sin_family = AF_INET;
-	serv_addr.sin_addr.s_addr = INADDR_ANY;
-	serv_addr.sin_port = htons(portno);
-	if (bind(sockfd, (struct sockaddr *) &serv_addr, sizeof(serv_addr)) < 0) {
-		error("ERROR on binding");
-	}
-	listen(sockfd, 5);
+	server.connect(portno);
 
-	struct sockaddr_in cli_addr;
-	socklen_t clilen = sizeof(cli_addr);
-
-	while (!done) {
-		int newsockfd = accept(sockfd, (struct sockaddr *) &cli_addr, &clilen);
-		if (newsockfd < 0) {
-			error("ERROR on accept");
-		}
-		printf("-\n");
-		int pid = fork();
-		if (pid < 0) {
-			error("ERROR on fork");
-		}
-		if (pid == 0) {
-			close(sockfd);
-			dostuff(newsockfd);
-			exit(0);
-		} else {
-			close(newsockfd);
-		}
-	}
-
-	close(sockfd);
+	server.listen();
 
 	return 0;
-}
-
-void dostuff(int newsockfd) {
-	char buffer[256];
-	bzero(buffer, 256);
-
-	int n = read(newsockfd, buffer, 255);
-	if (n < 0) {
-		error("ERROR reading from socket");
-	}
-
-	printf("Here is the message: %s\n", buffer);
-	n = write(newsockfd, "Received", sizeof("Received"));
-	if (n < 0) {
-		error("ERROR writing to socket");
-	}
-
-	close(newsockfd);
 }
 
