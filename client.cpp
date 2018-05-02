@@ -5,8 +5,8 @@
 #include <string.h>
 #include <netdb.h>
 
-Client::Client() {
-	sockfd = -1;
+Client::Client()
+	: sockfd(-1) {
 }
 
 Client::~Client() {
