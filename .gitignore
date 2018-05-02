@@ -1,4 +1,4 @@
 start_arc
 start_client
-server
+start_server
 **/*.o
