@@ -1,13 +1,13 @@
 CC=g++
 CFLAGS=-g -c -Wall -std=c++14
 LDFLAGS=
-CLIENT_SOURCES=start_client.cpp client.cpp
+CLIENT_SOURCES=start_arc.cpp arc.cpp client.cpp
 CLIENT_OBJECTS=$(CLIENT_SOURCES:.cpp=.o)
-CLIENT_EXECUTABLE=start_client
+CLIENT_EXECUTABLE=start_arc
 
-SERVER_SOURCES=server.cpp
+SERVER_SOURCES=start_server.cpp server.cpp
 SERVER_OBJECTS=$(SERVER_SOURCES:.cpp=.o)
-SERVER_EXECUTABLE=server
+SERVER_EXECUTABLE=start_server
 
 all: $(CLIENT_SOURCES) $(CLIENT_EXECUTABLE) $(SERVER_SOURCES) $(SERVER_EXECUTABLE)
 
