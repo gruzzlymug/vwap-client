@@ -3,6 +3,7 @@ class Server {
 	bool done;
 
 	void dostuff(int newsockfd);
+	//void dostuff_old(int newsockfd);
 
 public:
 	Server();

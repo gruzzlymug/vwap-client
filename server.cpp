@@ -56,6 +56,7 @@ void Server::listen() {
 	socklen_t clilen = sizeof(cli_addr);
 
 	while (!done) {
+		printf("accepting\n");
 		int newsockfd = accept(sockfd, (struct sockaddr *) &cli_addr, &clilen);
 		if (newsockfd < 0) {
 			perror("ERROR on accept");
@@ -83,21 +84,58 @@ void Server::stop() {
 
 void Server::dostuff(int newsockfd) {
 	char buffer[256];
+	while (true) {
+		printf("Sending Quote\n");
+		buffer[0] = 0x04;
+		buffer[1] = 0x01;
+		int n = write(newsockfd, buffer, 2);
+		if (n < 0) {
+		}
+		buffer[0] = 0xde;
+		buffer[1] = 0xad;
+		buffer[2] = 0xbe;
+		buffer[3] = 0xef;
+		int p = write(newsockfd, buffer, 4);
+		if (p < 0) {
+		}
+		sleep(9);
+	}
+}
+/*
+void Server::dostuff_old(int newsockfd) {
+	char buffer[256];
 	bzero(buffer, 256);
 
+  while (true) {
 	int n = read(newsockfd, buffer, 255);
 	if (n < 0) {
 		perror("ERROR reading from socket");
 	}
 
-	printf("Here is the message: %s\n", buffer);
-	n = write(newsockfd, "Received", sizeof("Received"));
+	if (strncmp("QUIT", buffer, strlen("QUIT")) == 0) {
+		break;
+	}
+
+	printf("Request: %s\n", buffer);
+	if (strncmp("QUOTE", buffer, strlen("QUOTE")) == 0) {
+		printf("Sending Quote\n");
+		n = write(newsockfd, "A QUOTE", sizeof("A QUOTE"));
+	} else if (strncmp("TRADE", buffer, strlen("TRADE")) == 0) {
+		printf("Sending Trade\n");
+		n = write(newsockfd, "A TRADE", sizeof("A TRADE"));
+	} else if (strncmp("ORDER", buffer, strlen("ORDER")) == 0) {
+		printf("Sending Order\n");
+		n = write(newsockfd, "AN ORDER", sizeof("AN ORDER"));
+	} else {
+		n = write(newsockfd, "Received", sizeof("Received"));
+	}
 	if (n < 0) {
 		perror("ERROR writing to socket");
 	}
-
+  }
+  printf("Bailing...\n");
 	// TODO use goto to get here from errors?
 	// TODO track orphaned socket if returning
 	close(newsockfd);
 }
-
+*/
