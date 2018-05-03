@@ -1,9 +1,17 @@
-struct MdHeader {
+//namespace xyz;
+struct Header {
 	unsigned char length;
 	unsigned char message_type;
 };
 
-struct MdQuote {
+struct Common {
+	unsigned long timestamp;
+	char symbol[8];
+	int price_c;
+	unsigned int qty;
+};
+
+struct Quote {
 	unsigned long timestamp;
 	char symbol[8];
 	int bid_price_c;
@@ -12,10 +20,17 @@ struct MdQuote {
 	unsigned int ask_qty;
 };
 
-struct MdTrade {
+struct Trade {
 	unsigned long timestamp;
 	char symbol[8];
 	int price_c;
 	unsigned int qty;
 };
 
+struct Order {
+	uint64_t timestamp;
+	char symbol[8];
+	int32_t price_c;
+	uint32_t qty;
+	char side[1];
+};

@@ -1,3 +1,5 @@
+#include "server.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -6,25 +8,8 @@
 #include <netinet/in.h>
 #include <signal.h>
 
-// TODO ? perror followed by exit(1);
-class Server {
-	int sockfd;
-	bool done;
-
-	void dostuff(int newsockfd);
-
-public:
-	Server();
-	~Server();
-
-	void connect(int port);
-	void listen();
-
-	void stop();
-};
-
-Server::Server()
-	: sockfd(-1), done(false) {
+Server::Server(int mode)
+	: sockfd(-1), mode(mode), done(false) {
 	signal(SIGCHLD, SIG_IGN);
 }
 
@@ -70,7 +55,16 @@ void Server::listen() {
 		}
 		if (pid == 0) {
 			close(sockfd);
-			dostuff(newsockfd);
+			switch (mode) {
+			case 0:
+				dostuff(newsockfd);
+				break;
+			case 1:
+				send_orders(newsockfd);
+				break;
+			default:
+				printf("BAD MODE %d\n", mode);
+			}
 			exit(0);
 		} else {
 			close(newsockfd);
@@ -101,6 +95,27 @@ void Server::dostuff(int newsockfd) {
 		sleep(9);
 	}
 }
+
+void Server::send_orders(int socket) {
+	char buffer[256];
+	while (true) {
+		printf("Sending Order\n");
+		buffer[0] = 0x04;
+		buffer[1] = 0x01;
+		int n = write(socket, buffer, 2);
+		if (n < 0) {
+		}
+		buffer[0] = 0xea;
+		buffer[1] = 0xea;
+		buffer[2] = 0xea;
+		buffer[3] = 0xea;
+		int p = write(socket, buffer, 4);
+		if (p < 0) {
+		}
+		sleep(3);
+	}
+}
+
 /*
 void Server::dostuff_old(int newsockfd) {
 	char buffer[256];

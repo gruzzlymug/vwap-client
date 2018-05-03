@@ -1,5 +1,7 @@
 #include "arc.h"
 
+#include "market_types.h"
+
 #include <stdio.h>
 #include <unistd.h>
 #include <string.h>
@@ -18,35 +20,19 @@ Arc::~Arc() {
 	}
 }
 
-int Arc::start(char *hostname, int port) {
-	std::thread t1(pipe_market_data, hostname, port);
+int Arc::start(char *hostname, int port, int order_port) {
+	int socket = connect(hostname, port);
+	int order_socket = connect(hostname, order_port);
+	std::thread t1(pipe_market_data, socket);
+	std::thread t2(pipe_order_data, order_socket);
+	t2.join();
 	t1.join();
+	close(order_socket);
+	close(socket);
 	return 0;
 }
 
-int Arc::pipe_market_data(char *hostname, int port) {
-	int socket = ::socket(AF_INET, SOCK_STREAM, 0);
-	if (socket < 0) {
-		perror("ERROR opening socket");
-		return -1;
-	}
-
-	printf("Connecting to %s\n", hostname);
-	struct hostent *server = gethostbyname(hostname);
-	if (server == NULL) {
-		fprintf(stderr, "ERROR no such host\n");
-		return -1;
-	}
-
-	bzero((char *) &serv_addr, sizeof(serv_addr));
-	serv_addr.sin_family = AF_INET;
-	bcopy((char *)server->h_addr, (char *)&serv_addr.sin_addr.s_addr, server->h_length);
-	serv_addr.sin_port = htons(port);
-	if (::connect(socket, (struct sockaddr *) &serv_addr, sizeof(serv_addr)) < 0) {
-		perror("ERROR connecting");
-		return -1;
-	}
-
+int Arc::pipe_market_data(int socket) {
 	char buffer[256];
 	bzero(buffer, 256);
 
@@ -62,18 +48,37 @@ int Arc::pipe_market_data(char *hostname, int port) {
 		printf("b> %x\n", (unsigned char) buffer[3]);
 	}
 
-	close(socket);
+	return 0;
+}
 
+int Arc::pipe_order_data(int socket) {
+	char buffer[256];
+	bzero(buffer, 256);
+
+	printf("order: %d\n", (int) sizeof(Order));
+	while (true) {
+		read_bytes(socket, 2, buffer);
+		unsigned int length = (unsigned char) buffer[0];
+		unsigned int message_type = (unsigned char) buffer[1];
+		printf("-> %d %d\n", length, message_type);
+		read_bytes(socket, length, buffer);
+		printf("o> %x\n", (unsigned char) buffer[0]);
+		printf("o> %x\n", (unsigned char) buffer[1]);
+		printf("o> %x\n", (unsigned char) buffer[2]);
+		printf("o> %x\n", (unsigned char) buffer[3]);
+	}
 	return 0;
 }
 
 int Arc::connect(char *hostname, int port) {
-	sockfd = socket(AF_INET, SOCK_STREAM, 0);
+	int sockfd = socket(AF_INET, SOCK_STREAM, 0);
 	if (sockfd < 0) {
 		perror("ERROR opening socket");
 		return -1;
 	}
 
+	printf("Connecting to %s\n", hostname);
+	// TODO: understand management of *server memory
 	struct hostent *server = gethostbyname(hostname);
 	if (server == NULL) {
 		fprintf(stderr, "ERROR no such host\n");
@@ -88,7 +93,7 @@ int Arc::connect(char *hostname, int port) {
 		perror("ERROR connecting");
 		return -1;
 	}
-	return 0;
+	return sockfd;
 }
 
 int Arc::send(char *message) {

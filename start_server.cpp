@@ -10,8 +10,8 @@ void int_handler(int s) {
 }
 
 int main(int argc, char** argv) {
-	if (argc < 2) {
-		fprintf(stderr, "ERROR, no port provided\n");
+	if (argc < 3) {
+		fprintf(stderr, "ERROR, no port or mode provided\n");
 		exit(1);
 	}
 
@@ -22,7 +22,8 @@ int main(int argc, char** argv) {
 
     //sigaction(SIGINT, &sig_int_handler, NULL);
 
-	Server server;
+	int mode = atoi(argv[2]);
+	Server server(mode);
 
 	int portno = atoi(argv[1]);
 	server.connect(portno);
