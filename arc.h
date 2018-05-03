@@ -11,8 +11,9 @@ class Arc {
 public:
 	Arc();
 	~Arc();
-	int start(char *hostname, int port);
-	static int pipe_market_data(char *hostname, int port);
+	int start(char *hostname, int port, int order_port);
+	static int pipe_market_data(int socket);
+	static int pipe_order_data(int socket);
 	int connect(char *hostname, int port);
 	int send(char *message);
 	int receive();

@@ -10,22 +10,11 @@ int main(int argc, char** argv) {
 		exit(0);
 	}
 
-	Arc arc;
-
 	int portno = atoi(argv[2]);
-	//arc.pipe_market_data(argv[1], portno);
-	arc.start(argv[1], portno);
-
-	//char buffer[256];
-	//bzero(buffer, 256);
-	//while (strncmp("QUIT", buffer, strlen("QUIT")) != 0) {
-	//	printf("Enter the message: ");
-		//bzero(buffer, 256);
-		//fgets(buffer, 255, stdin);
-		
-		//arc.send(buffer);
-	//	arc.receive();
-	//}
+	int order_port = atoi(argv[3]);
+	
+	Arc arc;
+	arc.start(argv[1], portno, order_port);
 
 	return 0;
 }
