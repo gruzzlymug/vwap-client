@@ -1,10 +1,13 @@
 #pragma once
+#include "market_types.h"
 
+#include <vector>
 #include <netinet/in.h>
 
 class Arc {
 	int sockfd;
 	static struct sockaddr_in serv_addr;
+	static std::vector<Trade> trades;
 
 	static int read_bytes(int socket, unsigned int num_to_read, char *buffer);
 

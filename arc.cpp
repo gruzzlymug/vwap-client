@@ -1,7 +1,5 @@
 #include "arc.h"
 
-#include "market_types.h"
-
 #include <stdio.h>
 #include <unistd.h>
 #include <string.h>
@@ -9,6 +7,7 @@
 #include <thread>
 
 struct sockaddr_in Arc::serv_addr;
+std::vector<Trade> Arc::trades;
 
 Arc::Arc()
 	: sockfd(-1) {
@@ -40,12 +39,34 @@ int Arc::pipe_market_data(int socket) {
 		read_bytes(socket, 2, buffer);
 		unsigned int length = (unsigned char) buffer[0];
 		unsigned int message_type = (unsigned char) buffer[1];
-		printf("-> %d %d\n", length, message_type);
-		read_bytes(socket, length, buffer);
-		printf("b> %x\n", (unsigned char) buffer[0]);
-		printf("b> %x\n", (unsigned char) buffer[1]);
-		printf("b> %x\n", (unsigned char) buffer[2]);
-		printf("b> %x\n", (unsigned char) buffer[3]);
+		switch (message_type) {
+		case 1: {
+				printf("-> %d %d\n", length, message_type);
+				read_bytes(socket, length, buffer);
+				printf("q> %x\n", (unsigned char) buffer[0]);
+				printf("q> %x\n", (unsigned char) buffer[1]);
+				printf("q> %x\n", (unsigned char) buffer[2]);
+				printf("q> %x\n", (unsigned char) buffer[3]);
+				break;
+			}
+		case 2: {
+				Trade trade;
+				printf("-> %d %d\n", length, message_type);
+				read_bytes(socket, length, buffer);
+				memcpy(&trade, buffer, sizeof(trade));
+				printf("t> %x\n", (unsigned char) buffer[0]);
+				printf("t> %x\n", (unsigned char) buffer[1]);
+				printf("t> %x\n", (unsigned char) buffer[2]);
+				printf("t> %x\n", (unsigned char) buffer[3]);
+				printf("t> %x\n", (unsigned char) buffer[4]);
+				printf("t> %x\n", (unsigned char) buffer[5]);
+				printf("t> %x\n", (unsigned char) buffer[6]);
+				printf("t> %x\n", (unsigned char) buffer[7]);
+				break;
+			}
+		default:
+				printf("PROBLEM\n");
+		}
 	}
 
 	return 0;
