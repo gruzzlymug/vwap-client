@@ -85,8 +85,12 @@ void Server::dostuff(int newsockfd) {
 	Trade t;
 	while (true) {
 		uint64_t nanoseconds_since_epoch = duration_cast<nanoseconds>(high_resolution_clock::now().time_since_epoch()).count();
+		//printf("@ (%lx) %ld\n", nanoseconds_since_epoch, nanoseconds_since_epoch);
 		t.timestamp = nanoseconds_since_epoch;
-		//printf("@ (%lx) %ld\n", nanoseconds_since_epoch, t.timestamp);
+		bzero(t.symbol, 8);
+		strncpy(t.symbol, "bit.usd", strlen("bit.usd")) ;
+		t.price_c = 1423;
+		t.qty = 5;
 
 		send_trade(t, newsockfd);
 		sleep(9);

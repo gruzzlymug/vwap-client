@@ -10,11 +10,15 @@ int main(int argc, char** argv) {
 		exit(0);
 	}
 
-	int portno = atoi(argv[2]);
-	int order_port = atoi(argv[3]);
+	ArcConfig config;
+	bzero(&config, sizeof(config));
+	strncpy(config.market_server_ip, argv[1], strlen(argv[1]));
+	config.market_server_port = atoi(argv[2]);
+	strncpy(config.order_server_ip, argv[1], strlen(argv[1]));
+	config.order_server_port = atoi(argv[3]);
 	
 	Arc arc;
-	arc.start(argv[1], portno, order_port);
+	arc.start(config);
 
 	return 0;
 }
