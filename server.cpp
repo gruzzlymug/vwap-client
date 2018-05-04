@@ -1,5 +1,6 @@
 #include "server.h"
 
+#include <chrono>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -76,23 +77,61 @@ void Server::stop() {
 	done = true;
 }
 
+#include <chrono>
+
 void Server::dostuff(int newsockfd) {
-	char buffer[256];
+	using namespace std::chrono;
+
+	Trade t;
 	while (true) {
-		printf("Sending Quote\n");
-		buffer[0] = 0x04;
-		buffer[1] = 0x01;
-		int n = write(newsockfd, buffer, 2);
-		if (n < 0) {
-		}
-		buffer[0] = 0xde;
-		buffer[1] = 0xad;
-		buffer[2] = 0xbe;
-		buffer[3] = 0xef;
-		int p = write(newsockfd, buffer, 4);
-		if (p < 0) {
-		}
+		uint64_t nanoseconds_since_epoch = duration_cast<nanoseconds>(high_resolution_clock::now().time_since_epoch()).count();
+		t.timestamp = nanoseconds_since_epoch;
+		//printf("@ (%lx) %ld\n", nanoseconds_since_epoch, t.timestamp);
+
+		send_trade(t, newsockfd);
 		sleep(9);
+	}
+}
+
+void Server::send_quote(Quote quote, int socket) {
+	char buffer[256];
+	printf("Sending Quote\n");
+	buffer[0] = 0x04;
+	buffer[1] = 0x01;
+	int n = write(socket, buffer, 2);
+	if (n < 0) {
+	}
+	buffer[0] = 0xde;
+	buffer[1] = 0xad;
+	buffer[2] = 0xbe;
+	buffer[3] = 0xef;
+	int p = write(socket, buffer, 4);
+	if (p < 0) {
+	}
+}
+
+void Server::send_trade(Trade trade, int socket) {
+	char buffer[64];
+	unsigned char bytes_sent = sizeof(trade);
+
+	printf("Sending Trade\n");
+	buffer[0] = bytes_sent;
+	buffer[1] = 0x02;
+	int n = write(socket, buffer, 2);
+	if (n < 0) {
+	}
+	// TODO: check and send with proper endianness
+	//printf("t: %lx\n", trade.timestamp);
+	memcpy(buffer, &trade, sizeof(trade));
+	//buffer[1] = trade.timestamp & 0xff00;
+	//buffer[2] = trade.timestamp & 0xff00);
+	//buffer[3] = trade.timestamp & 0xff0000);
+	//buffer[4] = trade.timestamp & 0xff000000);
+	//buffer[5] = trade.timestamp & 0xff00000000);
+	//buffer[6] = trade.timestamp & 0xff0000000000);
+	//buffer[7] = trade.timestamp & 0xff000000000000);
+	int p = write(socket, buffer, bytes_sent);
+	if (p < 0) {
 	}
 }
 

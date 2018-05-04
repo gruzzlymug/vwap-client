@@ -1,4 +1,6 @@
-//namespace xyz;
+#pragma once
+#include <cstdint>
+
 struct Header {
 	unsigned char length;
 	unsigned char message_type;
