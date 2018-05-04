@@ -24,6 +24,8 @@ int Arc::start(char *hostname, int port, int order_port) {
 	int order_socket = connect(hostname, order_port);
 	std::thread t1(pipe_market_data, socket);
 	std::thread t2(pipe_order_data, order_socket);
+	std::thread t3(calc_vwap);
+	t3.join();
 	t2.join();
 	t1.join();
 	close(order_socket);
@@ -41,31 +43,35 @@ int Arc::pipe_market_data(int socket) {
 		unsigned int message_type = (unsigned char) buffer[1];
 		switch (message_type) {
 		case 1: {
-				printf("-> %d %d\n", length, message_type);
-				read_bytes(socket, length, buffer);
-				printf("q> %x\n", (unsigned char) buffer[0]);
-				printf("q> %x\n", (unsigned char) buffer[1]);
-				printf("q> %x\n", (unsigned char) buffer[2]);
-				printf("q> %x\n", (unsigned char) buffer[3]);
-				break;
-			}
+			printf("-> %d %d\n", length, message_type);
+			read_bytes(socket, length, buffer);
+			printf("q> %x\n", (unsigned char) buffer[0]);
+			printf("q> %x\n", (unsigned char) buffer[1]);
+			printf("q> %x\n", (unsigned char) buffer[2]);
+			printf("q> %x\n", (unsigned char) buffer[3]);
+			break;
+		}
 		case 2: {
-				Trade trade;
-				printf("-> %d %d\n", length, message_type);
-				read_bytes(socket, length, buffer);
-				memcpy(&trade, buffer, sizeof(trade));
-				printf("t> %x\n", (unsigned char) buffer[0]);
-				printf("t> %x\n", (unsigned char) buffer[1]);
-				printf("t> %x\n", (unsigned char) buffer[2]);
-				printf("t> %x\n", (unsigned char) buffer[3]);
-				printf("t> %x\n", (unsigned char) buffer[4]);
-				printf("t> %x\n", (unsigned char) buffer[5]);
-				printf("t> %x\n", (unsigned char) buffer[6]);
-				printf("t> %x\n", (unsigned char) buffer[7]);
-				break;
-			}
+			Trade trade;
+			printf("-> %d %d\n", length, message_type);
+			read_bytes(socket, length, buffer);
+			memcpy(&trade, buffer, sizeof(trade));
+			trades.push_back(trade);
+			printf("t> %lx %7s $%d x %d\n", trade.timestamp, trade.symbol, trade.price_c, trade.qty);
+			/*
+			printf("t> %x\n", (unsigned char) buffer[0]);
+			printf("t> %x\n", (unsigned char) buffer[1]);
+			printf("t> %x\n", (unsigned char) buffer[2]);
+			printf("t> %x\n", (unsigned char) buffer[3]);
+			printf("t> %x\n", (unsigned char) buffer[4]);
+			printf("t> %x\n", (unsigned char) buffer[5]);
+			printf("t> %x\n", (unsigned char) buffer[6]);
+			printf("t> %x\n", (unsigned char) buffer[7]);
+			*/
+			break;
+		}
 		default:
-				printf("PROBLEM\n");
+			printf("PROBLEM\n");
 		}
 	}
 
@@ -89,6 +95,13 @@ int Arc::pipe_order_data(int socket) {
 		printf("o> %x\n", (unsigned char) buffer[3]);
 	}
 	return 0;
+}
+
+int Arc::calc_vwap() {
+	while (true) {
+		printf("tc: %lu\n", trades.size());
+		sleep(1);
+	}
 }
 
 int Arc::connect(char *hostname, int port) {
