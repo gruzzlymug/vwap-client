@@ -7,9 +7,9 @@
 struct ArcConfig {
 	char symbol[8];
 	char side;
-    unsigned int max_qty;
-    unsigned int vwap_period;
-    unsigned int order_timeout;
+    unsigned int qty_max;
+    unsigned int vwap_period_s;
+    unsigned int order_timeout_s;
     // TODO: unify ip:port
     char market_server_ip[32];
     unsigned int market_server_port;
@@ -18,7 +18,7 @@ struct ArcConfig {
 };
 
 class Arc {
-	int sockfd;
+	static ArcConfig config;
 	static struct sockaddr_in serv_addr;
 	static std::vector<Trade> trades;
 
@@ -27,12 +27,11 @@ class Arc {
 public:
 	Arc();
 	~Arc();
-	int start(ArcConfig& config);
+	int start(ArcConfig *new_config);
 	static int pipe_market_data(int socket);
 	static int pipe_order_data(int socket);
 	static int calc_vwap();
 	int connect(char *hostname, int port);
 	int send(char *message);
-	int receive();
 };
 

@@ -1,27 +1,30 @@
 #include "arc.h"
 
-#include <stdio.h>
-#include <unistd.h>
-#include <string.h>
-#include <netdb.h>
+#include <algorithm>
+#include <chrono>
 #include <thread>
 
+#include <netdb.h>
+#include <stdio.h>
+#include <string.h>
+#include <unistd.h>
+
+using namespace std::chrono;
+
+ArcConfig Arc::config;
 struct sockaddr_in Arc::serv_addr;
 std::vector<Trade> Arc::trades;
 
-Arc::Arc()
-	: sockfd(-1) {
+Arc::Arc() {
 }
 
 Arc::~Arc() {
-	if (sockfd >= 0) {
-		close(sockfd);
-	}
 }
 
-int Arc::start(ArcConfig& config) {
+int Arc::start(ArcConfig *new_config) {
 	//printf("%s:%d\n", config.market_server_ip, config.market_server_port);
 	//printf("%s:%d\n", config.order_server_ip, config.order_server_port);
+	memcpy(&config, new_config, sizeof(ArcConfig));
 
 	int market_socket = connect(config.market_server_ip, config.market_server_port);
 	int order_socket = connect(config.order_server_ip, config.order_server_port);
@@ -34,6 +37,30 @@ int Arc::start(ArcConfig& config) {
 	close(order_socket);
 	close(market_socket);
 	return 0;
+}
+
+int Arc::calc_vwap() {
+	while (true) {
+		uint64_t now_ns = duration_cast<nanoseconds>(high_resolution_clock::now().time_since_epoch()).count();
+		uint64_t period_ns = config.vwap_period_s * 1000000000;
+		int64_t total_spent = 0;
+		int64_t total_contracts = 0;
+		for (auto t : trades) {
+			total_spent += t.price_c * t.qty * 100;
+			total_contracts += t.qty;
+			if (now_ns - period_ns < t.timestamp) {
+				printf("v> %lx %lx %7s %d %d\n", now_ns, t.timestamp, t.symbol, t.price_c, t.qty);
+			} else {
+				printf("_> %lx %lx %7s %d %d\n", now_ns, t.timestamp, t.symbol, t.price_c, t.qty);
+			}
+		}
+		int64_t vwap = INTMAX_MAX;
+		if (total_contracts > 0) {
+			vwap = total_spent / total_contracts;
+		}
+		printf("ts = %ld\n", vwap);
+		sleep(2);
+	}
 }
 
 int Arc::pipe_market_data(int socket) {
@@ -85,26 +112,19 @@ int Arc::pipe_order_data(int socket) {
 	char buffer[256];
 	bzero(buffer, 256);
 
-	printf("order: %d\n", (int) sizeof(Order));
+	printf("piping order data\n");
 	while (true) {
-		read_bytes(socket, 2, buffer);
-		unsigned int length = (unsigned char) buffer[0];
-		unsigned int message_type = (unsigned char) buffer[1];
-		printf("-> %d %d\n", length, message_type);
-		read_bytes(socket, length, buffer);
-		printf("o> %x\n", (unsigned char) buffer[0]);
-		printf("o> %x\n", (unsigned char) buffer[1]);
-		printf("o> %x\n", (unsigned char) buffer[2]);
-		printf("o> %x\n", (unsigned char) buffer[3]);
+		Order order;
+		read_bytes(socket, 32, buffer);
+		memcpy(&order, buffer, sizeof(order));
+		// TODO: deal with 7 char ticker
+		printf("o> %lx %7s %c $%d x %d\n", order.timestamp, order.symbol, order.side, order.price_c, order.qty);
+		//printf("o> %x\n", (unsigned char) buffer[0]);
+		//printf("o> %x\n", (unsigned char) buffer[1]);
+		//printf("o> %x\n", (unsigned char) buffer[2]);
+		//printf("o> %x\n", (unsigned char) buffer[3]);
 	}
 	return 0;
-}
-
-int Arc::calc_vwap() {
-	while (true) {
-		printf("tc: %lu\n", trades.size());
-		sleep(1);
-	}
 }
 
 int Arc::connect(char *hostname, int port) {
@@ -134,11 +154,11 @@ int Arc::connect(char *hostname, int port) {
 }
 
 int Arc::send(char *message) {
-	int n = write(sockfd, message, strlen(message));
-	if (n < 0) {
-		perror("ERROR writing to socket");
-		return -1;
-	}
+	//int n = write(sockfd, message, strlen(message));
+	//if (n < 0) {
+	//	perror("ERROR writing to socket");
+	//	return -1;
+	//}
 	return 0;
 }
 
@@ -152,18 +172,6 @@ int Arc::read_bytes(int socket, unsigned int num_to_read, char *buffer) {
 		}
 		bytes_read += n;
 	}
-	return 0;
-}
-
-int Arc::receive() {
-	char buffer[256];
-	bzero(buffer, 256);
-	int n = read(sockfd, buffer, 255);
-	if (n < 0) {
-		perror("ERROR reading from socket");
-		return -1;
-	}
-	printf("%s\n", buffer);
 	return 0;
 }
 

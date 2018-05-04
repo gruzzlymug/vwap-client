@@ -1,6 +1,7 @@
 #include "server.h"
 
 #include <chrono>
+#include <random>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -8,6 +9,8 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <signal.h>
+
+using namespace std::chrono;
 
 Server::Server(int mode)
 	: sockfd(-1), mode(mode), done(false) {
@@ -58,7 +61,7 @@ void Server::listen() {
 			close(sockfd);
 			switch (mode) {
 			case 0:
-				dostuff(newsockfd);
+				send_market_data(newsockfd);
 				break;
 			case 1:
 				send_orders(newsockfd);
@@ -77,10 +80,13 @@ void Server::stop() {
 	done = true;
 }
 
-#include <chrono>
 
-void Server::dostuff(int newsockfd) {
-	using namespace std::chrono;
+void Server::send_market_data(int socket) {
+	std::random_device rd;
+	std::mt19937 gen(rd());
+	std::uniform_int_distribution<> price_range(1, 60);
+	std::uniform_int_distribution<> contract_range(1, 13);
+	std::uniform_int_distribution<> delay_range(1, 100);
 
 	Trade t;
 	while (true) {
@@ -88,12 +94,39 @@ void Server::dostuff(int newsockfd) {
 		//printf("@ (%lx) %ld\n", nanoseconds_since_epoch, nanoseconds_since_epoch);
 		t.timestamp = nanoseconds_since_epoch;
 		bzero(t.symbol, 8);
-		strncpy(t.symbol, "bit.usd", strlen("bit.usd")) ;
-		t.price_c = 1423;
-		t.qty = 5;
+		strncpy(t.symbol, "BTC.USD", strlen("BTC.USD")) ;
+		t.price_c = 93 + price_range(gen);
+		t.qty = contract_range(gen);
 
-		send_trade(t, newsockfd);
-		sleep(9);
+		send_trade(t, socket);
+
+		unsigned int delay_us = delay_range(gen) * 10000;
+		usleep(delay_us);
+	}
+}
+
+void Server::send_orders(int socket) {
+	std::random_device rd;
+	std::mt19937 gen(rd());
+	std::uniform_int_distribution<> price_range(1, 60);
+	std::uniform_int_distribution<> contract_range(1, 13);
+	std::uniform_int_distribution<> side_range(0, 1);
+	std::uniform_int_distribution<> delay_range(1, 100);
+
+	Order o;
+	while (true) {
+		uint64_t nanoseconds_since_epoch = duration_cast<nanoseconds>(high_resolution_clock::now().time_since_epoch()).count();
+		o.timestamp = nanoseconds_since_epoch;
+		bzero(o.symbol, 8);
+		strncpy(o.symbol, "BTC.USD", strlen("BTC.USD"));
+		o.price_c = 73 + price_range(gen);
+		o.qty = contract_range(gen);
+		o.side = side_range(gen) == 0 ? 'B' : 'S';
+
+		send_order(o, socket);
+
+		unsigned int delay_us = delay_range(gen) * 500000;
+		usleep(delay_us);
 	}
 }
 
@@ -114,6 +147,7 @@ void Server::send_quote(Quote quote, int socket) {
 	}
 }
 
+// TODO: send pointer
 void Server::send_trade(Trade trade, int socket) {
 	char buffer[64];
 	unsigned char bytes_sent = sizeof(trade);
@@ -139,61 +173,15 @@ void Server::send_trade(Trade trade, int socket) {
 	}
 }
 
-void Server::send_orders(int socket) {
+// TODO: send pointer
+void Server::send_order(Order order, int socket) {
 	char buffer[256];
-	while (true) {
-		printf("Sending Order\n");
-		buffer[0] = 0x04;
-		buffer[1] = 0x01;
-		int n = write(socket, buffer, 2);
-		if (n < 0) {
-		}
-		buffer[0] = 0xea;
-		buffer[1] = 0xea;
-		buffer[2] = 0xea;
-		buffer[3] = 0xea;
-		int p = write(socket, buffer, 4);
-		if (p < 0) {
-		}
-		sleep(3);
+
+	printf("Sending Order\n");
+	unsigned char bytes_sent = sizeof(order);
+	memcpy(buffer, &order, sizeof(order));
+	int n = write(socket, buffer, bytes_sent);
+	if (n < 0) {
 	}
 }
 
-/*
-void Server::dostuff_old(int newsockfd) {
-	char buffer[256];
-	bzero(buffer, 256);
-
-  while (true) {
-	int n = read(newsockfd, buffer, 255);
-	if (n < 0) {
-		perror("ERROR reading from socket");
-	}
-
-	if (strncmp("QUIT", buffer, strlen("QUIT")) == 0) {
-		break;
-	}
-
-	printf("Request: %s\n", buffer);
-	if (strncmp("QUOTE", buffer, strlen("QUOTE")) == 0) {
-		printf("Sending Quote\n");
-		n = write(newsockfd, "A QUOTE", sizeof("A QUOTE"));
-	} else if (strncmp("TRADE", buffer, strlen("TRADE")) == 0) {
-		printf("Sending Trade\n");
-		n = write(newsockfd, "A TRADE", sizeof("A TRADE"));
-	} else if (strncmp("ORDER", buffer, strlen("ORDER")) == 0) {
-		printf("Sending Order\n");
-		n = write(newsockfd, "AN ORDER", sizeof("AN ORDER"));
-	} else {
-		n = write(newsockfd, "Received", sizeof("Received"));
-	}
-	if (n < 0) {
-		perror("ERROR writing to socket");
-	}
-  }
-  printf("Bailing...\n");
-	// TODO use goto to get here from errors?
-	// TODO track orphaned socket if returning
-	close(newsockfd);
-}
-*/

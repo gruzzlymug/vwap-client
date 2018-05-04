@@ -5,12 +5,12 @@ class Server {
 	int mode;
 	bool done;
 
-	void send_quote(Quote quote, int socket);
-	void send_trade(Trade trade, int socket);
+	void send_market_data(int socket);
 	void send_orders(int socket);
 
-	void dostuff(int newsockfd);
-	//void dostuff_old(int newsockfd);
+	void send_quote(Quote quote, int socket);
+	void send_trade(Trade trade, int socket);
+	void send_order(Order order, int socket);
 
 public:
 	Server(int mode);
