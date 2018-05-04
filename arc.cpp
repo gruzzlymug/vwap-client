@@ -19,17 +19,20 @@ Arc::~Arc() {
 	}
 }
 
-int Arc::start(char *hostname, int port, int order_port) {
-	int socket = connect(hostname, port);
-	int order_socket = connect(hostname, order_port);
-	std::thread t1(pipe_market_data, socket);
+int Arc::start(ArcConfig& config) {
+	//printf("%s:%d\n", config.market_server_ip, config.market_server_port);
+	//printf("%s:%d\n", config.order_server_ip, config.order_server_port);
+
+	int market_socket = connect(config.market_server_ip, config.market_server_port);
+	int order_socket = connect(config.order_server_ip, config.order_server_port);
+	std::thread t1(pipe_market_data, market_socket);
 	std::thread t2(pipe_order_data, order_socket);
 	std::thread t3(calc_vwap);
 	t3.join();
 	t2.join();
 	t1.join();
 	close(order_socket);
-	close(socket);
+	close(market_socket);
 	return 0;
 }
 
