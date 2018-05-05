@@ -34,5 +34,5 @@ struct Order {
 	char symbol[8];
 	int32_t price_c;
 	uint32_t qty;
-	char side[1];
+	char side;
 };
