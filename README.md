@@ -1,4 +1,4 @@
-# VWAP Algorithmic Client (ARC)
+# VWAP Algorithmic Trading Client (ARC)
 
 To start a Market Data Streaming Server:
 
