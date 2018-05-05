@@ -6,11 +6,10 @@ class Server {
 	bool done;
 
 	void send_market_data(int socket);
-	void send_quotes(int socket);
+	void accept_orders(int socket);
 
-	void send_quote(Quote quote, int socket);
-	void send_trade(Trade trade, int socket);
-	void send_order(Order order, int socket);
+	void send_quote(int socket);
+	void send_trade(int socket);
 
 	int read_bytes(int socket, unsigned int num_to_read, char *buffer);
 

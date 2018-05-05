@@ -16,7 +16,6 @@ struct sockaddr_in Arc::serv_addr;
 int64_t Arc::vwap = INTMAX_MAX;
 std::vector<Trade> Arc::trades;
 
-
 Arc::Arc() {
 }
 
@@ -69,18 +68,18 @@ int Arc::calc_vwap() {
 		int64_t total_spent = 0;
 		int64_t total_contracts = 0;
 		for (auto t : trades) {
-			total_spent += t.price_c * t.qty * 100;
-			total_contracts += t.qty;
 			if (now_ns - period_ns < t.timestamp) {
-				printf("v> %lx %lx %7s %8d %4d\n", now_ns, t.timestamp, t.symbol, t.price_c, t.qty);
+				total_spent += t.price_c * t.qty * 100;
+				total_contracts += t.qty;
+				//printf("v> %lx %lx %7s %8d %4d\n", now_ns, t.timestamp, t.symbol, t.price_c, t.qty);
 			} else {
-				printf("_> %lx %lx %7s %8d %4d\n", now_ns, t.timestamp, t.symbol, t.price_c, t.qty);
+				//printf("_> %lx %lx %7s %8d %4d\n", now_ns, t.timestamp, t.symbol, t.price_c, t.qty);
 			}
 		}
 		if (total_contracts > 0) {
 			vwap = total_spent / total_contracts;
 		}
-		printf("ts = %ld\n", vwap);
+		printf("vwap = %ld\n", vwap);
 		sleep(1);
 	}
 }
@@ -93,22 +92,27 @@ int Arc::pipe_market_data(int socket) {
 		read_bytes(socket, 2, buffer);
 		unsigned int length = (unsigned char) buffer[0];
 		unsigned int message_type = (unsigned char) buffer[1];
+		//printf("-> %d %d\n", length, message_type);
 		switch (message_type) {
 		case 1: {
-			printf("-> %d %d\n", length, message_type);
+			Quote quote;
 			read_bytes(socket, length, buffer);
-			printf("q> %x\n", (unsigned char) buffer[0]);
-			printf("q> %x\n", (unsigned char) buffer[1]);
-			printf("q> %x\n", (unsigned char) buffer[2]);
-			printf("q> %x\n", (unsigned char) buffer[3]);
+			memcpy(&quote, buffer, sizeof(quote));
+			if (strncmp(quote.symbol, config.symbol, strlen(config.symbol)) == 0) {
+				printf("q> %lx %7s $%8d x %3d, $%8d x %3d\n", quote.timestamp, quote.symbol, quote.bid_price_c, quote.bid_qty, quote.ask_price_c, quote.ask_qty);
+				if (config.side == 'B' && (quote.ask_price_c * 100 <= vwap)) {
+					//printf("BUY\n");
+				} else if (config.side == 'S' && (quote.bid_price_c * 100 >= vwap)) {
+					//printf("SELL\n");
+				}
+			}
 			break;
 		}
 		case 2: {
 			Trade trade;
-			printf("-> %d %d\n", length, message_type);
 			read_bytes(socket, length, buffer);
 			memcpy(&trade, buffer, sizeof(trade));
-			if (strncmp(trade.symbol, config.symbol, strlen(config.symbol)) == 0) {
+			if (strncmp(trade.symbol, config.symbol, strlen(trade.symbol)) == 0) {
 				// TODO: emplace_back, custom allocator
 				trades.push_back(trade);
 			}
@@ -117,17 +121,7 @@ int Arc::pipe_market_data(int socket) {
 			uint64_t period_ns = config.vwap_period_s * 1000000000;
 			uint64_t cutoff_ns = now_ns - period_ns;
 			trades.erase(std::remove_if(trades.begin(), trades.end(), [cutoff_ns](Trade &t) { return t.timestamp < cutoff_ns; }), trades.end());
-			printf("t> %lx %7s $%d x %d\n", trade.timestamp, trade.symbol, trade.price_c, trade.qty);
-			/*
-			printf("t> %x\n", (unsigned char) buffer[0]);
-			printf("t> %x\n", (unsigned char) buffer[1]);
-			printf("t> %x\n", (unsigned char) buffer[2]);
-			printf("t> %x\n", (unsigned char) buffer[3]);
-			printf("t> %x\n", (unsigned char) buffer[4]);
-			printf("t> %x\n", (unsigned char) buffer[5]);
-			printf("t> %x\n", (unsigned char) buffer[6]);
-			printf("t> %x\n", (unsigned char) buffer[7]);
-			*/
+			printf("t> %lx %7s $%8d x %3d\n", trade.timestamp, trade.symbol, trade.price_c, trade.qty);
 			break;
 		}
 		default:
