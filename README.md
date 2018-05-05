@@ -1,4 +1,4 @@
-# cpp-server
+# VWAP AlgoRithmic Client
 
 To start a Market Data Streaming Server:
 
