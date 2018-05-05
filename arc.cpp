@@ -13,7 +13,9 @@ using namespace std::chrono;
 
 ArcConfig Arc::config;
 struct sockaddr_in Arc::serv_addr;
+int64_t Arc::vwap = INTMAX_MAX;
 std::vector<Trade> Arc::trades;
+
 
 Arc::Arc() {
 }
@@ -39,6 +41,27 @@ int Arc::start(ArcConfig *new_config) {
 	return 0;
 }
 
+int Arc::pipe_order_data(int socket) {
+	char buffer[256];
+	bzero(buffer, 256);
+
+	printf("piping order data\n");
+	if (vwap < 0) {
+		Order order;
+		unsigned char bytes_sent = sizeof(order);
+		memcpy(buffer, &order, sizeof(order));
+		int n = write(socket, buffer, bytes_sent);
+		if (n < 0) {
+		}
+
+		read_bytes(socket, 32, buffer);
+		memcpy(&order, buffer, sizeof(order));
+		// TODO: deal with 7 char ticker
+		printf("o> %lx %7s %c $%d x %d\n", order.timestamp, order.symbol, order.side, order.price_c, order.qty);
+	}
+	return 0;
+}
+
 int Arc::calc_vwap() {
 	while (true) {
 		uint64_t now_ns = duration_cast<nanoseconds>(high_resolution_clock::now().time_since_epoch()).count();
@@ -54,12 +77,11 @@ int Arc::calc_vwap() {
 				printf("_> %lx %lx %7s %8d %4d\n", now_ns, t.timestamp, t.symbol, t.price_c, t.qty);
 			}
 		}
-		int64_t vwap = INTMAX_MAX;
 		if (total_contracts > 0) {
 			vwap = total_spent / total_contracts;
 		}
 		printf("ts = %ld\n", vwap);
-		sleep(2);
+		sleep(1);
 	}
 }
 
@@ -113,25 +135,6 @@ int Arc::pipe_market_data(int socket) {
 		}
 	}
 
-	return 0;
-}
-
-int Arc::pipe_order_data(int socket) {
-	char buffer[256];
-	bzero(buffer, 256);
-
-	printf("piping order data\n");
-	while (true) {
-		Order order;
-		read_bytes(socket, 32, buffer);
-		memcpy(&order, buffer, sizeof(order));
-		// TODO: deal with 7 char ticker
-		printf("o> %lx %7s %c $%d x %d\n", order.timestamp, order.symbol, order.side, order.price_c, order.qty);
-		//printf("o> %x\n", (unsigned char) buffer[0]);
-		//printf("o> %x\n", (unsigned char) buffer[1]);
-		//printf("o> %x\n", (unsigned char) buffer[2]);
-		//printf("o> %x\n", (unsigned char) buffer[3]);
-	}
 	return 0;
 }
 

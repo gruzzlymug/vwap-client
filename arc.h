@@ -20,6 +20,7 @@ struct ArcConfig {
 class Arc {
 	static ArcConfig config;
 	static struct sockaddr_in serv_addr;
+	static int64_t vwap;
 	static std::vector<Trade> trades;
 
 	static int read_bytes(int socket, unsigned int num_to_read, char *buffer);

@@ -64,7 +64,7 @@ void Server::listen() {
 				send_market_data(newsockfd);
 				break;
 			case 1:
-				send_orders(newsockfd);
+				send_quotes(newsockfd);
 				break;
 			default:
 				printf("BAD MODE %d\n", mode);
@@ -117,7 +117,35 @@ void Server::send_market_data(int socket) {
 	}
 }
 
+/*
 void Server::send_orders(int socket) {
+    char buffer[256];
+    bzero(buffer, 256);
+
+    printf("piping order data\n");
+    while (true) {
+        Order order;
+        read_bytes(socket, 32, buffer);
+        memcpy(&order, buffer, sizeof(order));
+	    printf("o> %lx %7s %c $%d x %d\n", order.timestamp, order.symbol, order.side, order.price_c, order.qty);
+	}
+}
+*/
+
+int Server::read_bytes(int socket, unsigned int num_to_read, char *buffer) {
+	unsigned int bytes_read = 0;
+	while (bytes_read < num_to_read) {
+		int n = read(socket, buffer, num_to_read);
+        if (n < 0) {
+             perror("ERROR reading from socket");
+             return -1;
+         }
+         bytes_read += n;
+     }
+     return 0;
+}
+
+void Server::send_quotes(int socket) {
 	std::random_device rd;
 	std::mt19937 gen(rd());
 	std::uniform_int_distribution<> price_range(1, 60);
@@ -125,35 +153,37 @@ void Server::send_orders(int socket) {
 	std::uniform_int_distribution<> side_range(0, 1);
 	std::uniform_int_distribution<> delay_range(1, 100);
 
-	Order o;
+	unsigned char spread = 10;
+
+	Quote q;
 	while (true) {
-		uint64_t nanoseconds_since_epoch = duration_cast<nanoseconds>(high_resolution_clock::now().time_since_epoch()).count();
-		o.timestamp = nanoseconds_since_epoch;
-		bzero(o.symbol, 8);
-		strncpy(o.symbol, "BTC.USD", strlen("BTC.USD"));
-		o.price_c = 73 + price_range(gen);
-		o.qty = contract_range(gen);
-		o.side = side_range(gen) == 0 ? 'B' : 'S';
+		uint64_t now_ns = duration_cast<nanoseconds>(high_resolution_clock::now().time_since_epoch()).count();
+		q.timestamp = now_ns;
+		bzero(q.symbol, 8);
+		strncpy(q.symbol, "BTC.USD", strlen("BTC.USD"));
+		q.bid_price_c = 991330 + price_range(gen) - spread;
+		q.bid_qty = contract_range(gen);
+		q.ask_price_c = 991330 + price_range(gen) + spread;
+		q.ask_qty = contract_range(gen);
 
-		send_order(o, socket);
+		send_quote(q, socket);
 
-		unsigned int delay_us = delay_range(gen) * 500000;
+		unsigned int delay_us = delay_range(gen) * 50000;
 		usleep(delay_us);
 	}
 }
 
 void Server::send_quote(Quote quote, int socket) {
 	char buffer[256];
+	unsigned char quote_size = sizeof(quote);
+
 	printf("Sending Quote\n");
-	buffer[0] = 0x04;
+	buffer[0] = quote_size;
 	buffer[1] = 0x01;
 	int n = write(socket, buffer, 2);
 	if (n < 0) {
 	}
-	buffer[0] = 0xde;
-	buffer[1] = 0xad;
-	buffer[2] = 0xbe;
-	buffer[3] = 0xef;
+	memcpy(buffer, &quote, quote_size);
 	int p = write(socket, buffer, 4);
 	if (p < 0) {
 	}
@@ -171,15 +201,7 @@ void Server::send_trade(Trade trade, int socket) {
 	if (n < 0) {
 	}
 	// TODO: check and send with proper endianness
-	//printf("t: %lx\n", trade.timestamp);
 	memcpy(buffer, &trade, sizeof(trade));
-	//buffer[1] = trade.timestamp & 0xff00;
-	//buffer[2] = trade.timestamp & 0xff00);
-	//buffer[3] = trade.timestamp & 0xff0000);
-	//buffer[4] = trade.timestamp & 0xff000000);
-	//buffer[5] = trade.timestamp & 0xff00000000);
-	//buffer[6] = trade.timestamp & 0xff0000000000);
-	//buffer[7] = trade.timestamp & 0xff000000000000);
 	int p = write(socket, buffer, bytes_sent);
 	if (p < 0) {
 	}
