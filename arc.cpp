@@ -49,9 +49,9 @@ int Arc::calc_vwap() {
 			total_spent += t.price_c * t.qty * 100;
 			total_contracts += t.qty;
 			if (now_ns - period_ns < t.timestamp) {
-				printf("v> %lx %lx %7s %d %d\n", now_ns, t.timestamp, t.symbol, t.price_c, t.qty);
+				printf("v> %lx %lx %7s %8d %4d\n", now_ns, t.timestamp, t.symbol, t.price_c, t.qty);
 			} else {
-				printf("_> %lx %lx %7s %d %d\n", now_ns, t.timestamp, t.symbol, t.price_c, t.qty);
+				printf("_> %lx %lx %7s %8d %4d\n", now_ns, t.timestamp, t.symbol, t.price_c, t.qty);
 			}
 		}
 		int64_t vwap = INTMAX_MAX;
@@ -86,7 +86,15 @@ int Arc::pipe_market_data(int socket) {
 			printf("-> %d %d\n", length, message_type);
 			read_bytes(socket, length, buffer);
 			memcpy(&trade, buffer, sizeof(trade));
-			trades.push_back(trade);
+			if (strncmp(trade.symbol, config.symbol, strlen(config.symbol)) == 0) {
+				// TODO: emplace_back, custom allocator
+				trades.push_back(trade);
+			}
+
+			uint64_t now_ns = duration_cast<nanoseconds>(high_resolution_clock::now().time_since_epoch()).count();
+			uint64_t period_ns = config.vwap_period_s * 1000000000;
+			uint64_t cutoff_ns = now_ns - period_ns;
+			trades.erase(std::remove_if(trades.begin(), trades.end(), [cutoff_ns](Trade &t) { return t.timestamp < cutoff_ns; }), trades.end());
 			printf("t> %lx %7s $%d x %d\n", trade.timestamp, trade.symbol, trade.price_c, trade.qty);
 			/*
 			printf("t> %x\n", (unsigned char) buffer[0]);
