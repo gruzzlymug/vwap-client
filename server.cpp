@@ -64,7 +64,7 @@ void Server::listen() {
 				send_market_data(newsockfd);
 				break;
 			case 1:
-				send_quotes(newsockfd);
+				//accept_orders(newsockfd);
 				break;
 			default:
 				printf("BAD MODE %d\n", mode);
@@ -84,53 +84,25 @@ void Server::stop() {
 void Server::send_market_data(int socket) {
 	std::random_device rd;
 	std::mt19937 gen(rd());
-	std::uniform_int_distribution<> price_range(-100, 100);
-	std::uniform_int_distribution<> contract_range(1, 13);
 	std::uniform_int_distribution<> delay_range(1, 100);
-	std::uniform_int_distribution<> symbol_range(0, 2);
+	std::uniform_int_distribution<> data_type(0, 2);
 
-	Trade t;
 	while (true) {
-		uint64_t nanoseconds_since_epoch = duration_cast<nanoseconds>(high_resolution_clock::now().time_since_epoch()).count();
-		//printf("@ (%lx) %ld\n", nanoseconds_since_epoch, nanoseconds_since_epoch);
-		t.timestamp = nanoseconds_since_epoch;
-		bzero(t.symbol, 8);
-		switch (symbol_range(gen)) {
+		switch (data_type(gen)) {
 			case 0:
-				strncpy(t.symbol, "BTC.USD", strlen("BTC.USD")) ;
-				t.price_c = 991330 + price_range(gen) * 2;
-				break;
 			case 1:
-				strncpy(t.symbol, "ETH.USD", strlen("ETH.USD")) ;
-				t.price_c = 82050 + price_range(gen);
+				send_trade(socket);
+				break;
+			case 2:
+				send_quote(socket);
 				break;
 			default:
-				strncpy(t.symbol, "XYZ.USD", strlen("XYZ.USD")) ;
-				t.price_c = 1000 + price_range(gen);
+				break;
 		}
-		t.qty = contract_range(gen);
-
-		send_trade(t, socket);
-
 		unsigned int delay_us = delay_range(gen) * 1000;
 		usleep(delay_us);
 	}
 }
-
-/*
-void Server::send_orders(int socket) {
-    char buffer[256];
-    bzero(buffer, 256);
-
-    printf("piping order data\n");
-    while (true) {
-        Order order;
-        read_bytes(socket, 32, buffer);
-        memcpy(&order, buffer, sizeof(order));
-	    printf("o> %lx %7s %c $%d x %d\n", order.timestamp, order.symbol, order.side, order.price_c, order.qty);
-	}
-}
-*/
 
 int Server::read_bytes(int socket, unsigned int num_to_read, char *buffer) {
 	unsigned int bytes_read = 0;
@@ -145,35 +117,25 @@ int Server::read_bytes(int socket, unsigned int num_to_read, char *buffer) {
      return 0;
 }
 
-void Server::send_quotes(int socket) {
+void Server::send_quote(int socket) {
 	std::random_device rd;
 	std::mt19937 gen(rd());
 	std::uniform_int_distribution<> price_range(1, 60);
 	std::uniform_int_distribution<> contract_range(1, 13);
 	std::uniform_int_distribution<> side_range(0, 1);
-	std::uniform_int_distribution<> delay_range(1, 100);
 
 	unsigned char spread = 10;
 
-	Quote q;
-	while (true) {
-		uint64_t now_ns = duration_cast<nanoseconds>(high_resolution_clock::now().time_since_epoch()).count();
-		q.timestamp = now_ns;
-		bzero(q.symbol, 8);
-		strncpy(q.symbol, "BTC.USD", strlen("BTC.USD"));
-		q.bid_price_c = 991330 + price_range(gen) - spread;
-		q.bid_qty = contract_range(gen);
-		q.ask_price_c = 991330 + price_range(gen) + spread;
-		q.ask_qty = contract_range(gen);
+	Quote quote;
+	uint64_t now_ns = duration_cast<nanoseconds>(high_resolution_clock::now().time_since_epoch()).count();
+	quote.timestamp = now_ns;
+	bzero(quote.symbol, 8);
+	strncpy(quote.symbol, "BTC.USD", strlen("BTC.USD"));
+	quote.bid_price_c = 991230 + price_range(gen) - spread;
+	quote.bid_qty = contract_range(gen);
+	quote.ask_price_c = 991230 + price_range(gen) + spread;
+	quote.ask_qty = contract_range(gen);
 
-		send_quote(q, socket);
-
-		unsigned int delay_us = delay_range(gen) * 50000;
-		usleep(delay_us);
-	}
-}
-
-void Server::send_quote(Quote quote, int socket) {
 	char buffer[256];
 	unsigned char quote_size = sizeof(quote);
 
@@ -184,13 +146,37 @@ void Server::send_quote(Quote quote, int socket) {
 	if (n < 0) {
 	}
 	memcpy(buffer, &quote, quote_size);
-	int p = write(socket, buffer, 4);
+	int p = write(socket, buffer, quote_size);
 	if (p < 0) {
 	}
 }
 
-// TODO: send pointer
-void Server::send_trade(Trade trade, int socket) {
+void Server::send_trade(int socket) {
+	std::random_device rd;
+	std::mt19937 gen(rd());
+	std::uniform_int_distribution<> price_range(-100, 100);
+	std::uniform_int_distribution<> contract_range(1, 13);
+	std::uniform_int_distribution<> symbol_range(0, 2);
+
+	Trade trade;
+	uint64_t now_ns = duration_cast<nanoseconds>(high_resolution_clock::now().time_since_epoch()).count();
+	trade.timestamp = now_ns;
+	bzero(trade.symbol, 8);
+	switch (symbol_range(gen)) {
+		case 0:
+			strncpy(trade.symbol, "BTC.USD", strlen("BTC.USD")) ;
+			trade.price_c = 991330 + price_range(gen) * 2;
+			break;
+		case 1:
+			strncpy(trade.symbol, "ETH.USD", strlen("ETH.USD")) ;
+			trade.price_c = 82050 + price_range(gen);
+			break;
+		default:
+			strncpy(trade.symbol, "XYZ.USD", strlen("XYZ.USD")) ;
+			trade.price_c = 1000 + price_range(gen);
+	}
+	trade.qty = contract_range(gen);
+
 	char buffer[64];
 	unsigned char bytes_sent = sizeof(trade);
 
@@ -207,15 +193,15 @@ void Server::send_trade(Trade trade, int socket) {
 	}
 }
 
-// TODO: send pointer
-void Server::send_order(Order order, int socket) {
+void Server::accept_orders(int socket) {
 	char buffer[256];
+	Order order;
 
-	printf("Sending Order\n");
-	unsigned char bytes_sent = sizeof(order);
-	memcpy(buffer, &order, sizeof(order));
-	int n = write(socket, buffer, bytes_sent);
-	if (n < 0) {
+	printf("Accepting Order\n");
+	unsigned char bytes_needed = sizeof(order);
+	int n = read_bytes(socket, bytes_needed, buffer);
+	if (n > 0) {
+		memcpy(buffer, &order, bytes_needed);
 	}
 }
 
