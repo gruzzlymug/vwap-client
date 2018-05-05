@@ -1,7 +1,7 @@
 CC=g++
 CFLAGS=-g -c -Wall -std=c++14 -lpthread
 LDFLAGS=-pthread -lpthread
-CLIENT_SOURCES=start_arc.cpp arc.cpp client.cpp
+CLIENT_SOURCES=start_arc.cpp arc.cpp
 CLIENT_OBJECTS=$(CLIENT_SOURCES:.cpp=.o)
 CLIENT_EXECUTABLE=start_arc
 
