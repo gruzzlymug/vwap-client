@@ -84,9 +84,10 @@ void Server::stop() {
 void Server::send_market_data(int socket) {
 	std::random_device rd;
 	std::mt19937 gen(rd());
-	std::uniform_int_distribution<> price_range(1, 60);
+	std::uniform_int_distribution<> price_range(-100, 100);
 	std::uniform_int_distribution<> contract_range(1, 13);
 	std::uniform_int_distribution<> delay_range(1, 100);
+	std::uniform_int_distribution<> symbol_range(0, 2);
 
 	Trade t;
 	while (true) {
@@ -94,13 +95,24 @@ void Server::send_market_data(int socket) {
 		//printf("@ (%lx) %ld\n", nanoseconds_since_epoch, nanoseconds_since_epoch);
 		t.timestamp = nanoseconds_since_epoch;
 		bzero(t.symbol, 8);
-		strncpy(t.symbol, "BTC.USD", strlen("BTC.USD")) ;
-		t.price_c = 93 + price_range(gen);
+		switch (symbol_range(gen)) {
+			case 0:
+				strncpy(t.symbol, "BTC.USD", strlen("BTC.USD")) ;
+				t.price_c = 991330 + price_range(gen) * 2;
+				break;
+			case 1:
+				strncpy(t.symbol, "ETH.USD", strlen("ETH.USD")) ;
+				t.price_c = 82050 + price_range(gen);
+				break;
+			default:
+				strncpy(t.symbol, "XYZ.USD", strlen("XYZ.USD")) ;
+				t.price_c = 1000 + price_range(gen);
+		}
 		t.qty = contract_range(gen);
 
 		send_trade(t, socket);
 
-		unsigned int delay_us = delay_range(gen) * 10000;
+		unsigned int delay_us = delay_range(gen) * 1000;
 		usleep(delay_us);
 	}
 }
