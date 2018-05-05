@@ -8,6 +8,14 @@ Supply a Port and the Mode (0 = market data server)
 ./start_server 8081 0
 ```
 
+To start an Order Placement Server:
+
+Supply a Port and the Mode (1 = order placement server)
+
+```
+./start_server 9091 1
+```
+
 To start the algorithm:
 
 Supply an IP Address and 2 Ports (market data server, quote acceptor)
