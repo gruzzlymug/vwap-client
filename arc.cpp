@@ -9,6 +9,9 @@
 #include <string.h>
 #include <unistd.h>
 
+#define __STDC_FORMAT_MACROS
+#include <inttypes.h>
+
 using namespace std::chrono;
 
 ArcConfig Arc::config;
@@ -56,7 +59,7 @@ int Arc::send_order_data(int socket) {
         read_bytes(socket, 32, buffer);
         memcpy(&order, buffer, sizeof(order));
         // TODO: deal with 7 char ticker
-        printf("o> %lx %7s %c $%d x %d\n", order.timestamp, order.symbol, order.side, order.price_c, order.qty);
+        printf("o> %" PRIu64 " %7s %c $%d x %d\n", order.timestamp, order.symbol, order.side, order.price_c, order.qty);
     }
     return 0;
 }
@@ -79,7 +82,7 @@ int Arc::calc_vwap() {
         if (total_contracts > 0) {
             vwap = total_spent / total_contracts;
         }
-        printf("vwap = %ld\n", vwap);
+        printf("vwap = %" PRIu64 "\n", vwap);
         sleep(1);
     }
 }
