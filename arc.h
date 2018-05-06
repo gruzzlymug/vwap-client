@@ -5,8 +5,8 @@
 #include <netinet/in.h>
 
 struct ArcConfig {
-	char symbol[8];
-	char side;
+    char symbol[8];
+    char side;
     unsigned int qty_max;
     unsigned int vwap_period_s;
     unsigned int order_timeout_s;
@@ -18,21 +18,20 @@ struct ArcConfig {
 };
 
 class Arc {
-	static ArcConfig config;
-	static struct sockaddr_in serv_addr;
-	static int64_t vwap;
-	static std::vector<Trade> trades;
+    static ArcConfig config;
+    static struct sockaddr_in serv_addr;
+    static int64_t vwap;
+    static std::vector<Trade> trades;
 
-	static int read_bytes(int socket, unsigned int num_to_read, char *buffer);
+    static int read_bytes(int socket, unsigned int num_to_read, char *buffer);
 
 public:
-	Arc();
-	~Arc();
-	int start(ArcConfig *new_config);
-	static int pipe_market_data(int socket);
-	static int pipe_order_data(int socket);
-	static int calc_vwap();
-	int connect(char *hostname, int port);
-	int send(char *message);
+    Arc();
+    ~Arc();
+    int start(ArcConfig *new_config);
+    static int stream_market_data(int socket);
+    static int send_order_data(int socket);
+    static int calc_vwap();
+    int connect(char *hostname, int port);
+    int send(char *message);
 };
-
