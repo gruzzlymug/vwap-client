@@ -6,14 +6,14 @@
 #include <string.h>
 
 void int_handler(int s) {
-	printf("Caught signal %d!!!\n",s);
+    printf("Caught signal %d!!!\n",s);
 }
 
 int main(int argc, char** argv) {
-	if (argc < 3) {
-		fprintf(stderr, "ERROR, no port or mode provided\n");
-		exit(1);
-	}
+    if (argc < 3) {
+        fprintf(stderr, "ERROR, no port or mode provided\n");
+        exit(1);
+    }
 
     struct sigaction sig_int_handler;
     sig_int_handler.sa_handler = int_handler;
@@ -22,21 +22,13 @@ int main(int argc, char** argv) {
 
     //sigaction(SIGINT, &sig_int_handler, NULL);
 
-	int mode = atoi(argv[2]);
-	Server server(mode);
+    int mode = atoi(argv[2]);
+    Server server(mode);
 
-	int portno = atoi(argv[1]);
-	server.connect(portno);
+    int portno = atoi(argv[1]);
+    server.connect(portno);
 
-	server.listen();
+    server.listen();
 
-	return 0;
+    return 0;
 }
-
-//	printf("Enter the message: ");
-//	char buffer[256];
-//	bzero(buffer, 256);
-//	fgets(buffer, 255, stdin);
-//	server.send(buffer);
-//	server.receive();
-
