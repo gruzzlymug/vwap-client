@@ -60,14 +60,14 @@ void Server::listen() {
         if (pid == 0) {
             close(sockfd);
             switch (mode) {
-            case 0:
-                send_market_data(newsockfd);
-                break;
-            case 1:
-                //accept_orders(newsockfd);
-                break;
-            default:
-                printf("BAD MODE %d\n", mode);
+                case 0:
+                    send_market_data(newsockfd);
+                    break;
+                case 1:
+                    //accept_orders(newsockfd);
+                    break;
+                default:
+                    printf("BAD MODE %d\n", mode);
             }
             exit(0);
         } else {
@@ -79,7 +79,6 @@ void Server::listen() {
 void Server::stop() {
     done = true;
 }
-
 
 void Server::send_market_data(int socket) {
     std::random_device rd;
@@ -158,37 +157,51 @@ void Server::send_trade(int socket) {
     std::uniform_int_distribution<> contract_range(1, 13);
     std::uniform_int_distribution<> symbol_range(0, 2);
 
-    Trade trade;
     uint64_t now_ns = duration_cast<nanoseconds>(high_resolution_clock::now().time_since_epoch()).count();
-    trade.timestamp = now_ns;
-    bzero(trade.symbol, 8);
+    uint64_t timestamp = now_ns;
+    uint64_t symbol = 0;
+    int32_t price_c = 0;
     switch (symbol_range(gen)) {
         case 0:
-            strncpy(trade.symbol, "BTC.USD", strlen("BTC.USD")) ;
-            trade.price_c = 991330 + price_range(gen) * 2;
+            strncpy((char *)&symbol, "BTC.USD", strlen("BTC.USD")) ;
+            price_c = 991330 + price_range(gen) * 2;
             break;
         case 1:
-            strncpy(trade.symbol, "ETH.USD", strlen("ETH.USD")) ;
-            trade.price_c = 82050 + price_range(gen);
+            strncpy((char *)&symbol, "ETH.USD", strlen("ETH.USD")) ;
+            price_c = 82050 + price_range(gen);
             break;
         default:
-            strncpy(trade.symbol, "XYZ.USD", strlen("XYZ.USD")) ;
-            trade.price_c = 1000 + price_range(gen);
+            strncpy((char *)&symbol, "XYZ.USD", strlen("XYZ.USD")) ;
+            price_c = 1000 + price_range(gen);
     }
-    trade.qty = contract_range(gen);
+    uint32_t qty = contract_range(gen);
 
-    char buffer[64];
+    Trade trade(timestamp, symbol, price_c, qty);
+
+    char header[2];
     unsigned char bytes_sent = sizeof(trade);
 
     printf("Sending Trade\n");
-    buffer[0] = bytes_sent;
-    buffer[1] = 0x02;
-    int n = write(socket, buffer, 2);
+    header[0] = bytes_sent;
+    header[1] = 0x02;
+    int n = write(socket, header, 2);
     if (n < 0) {
     }
-    // TODO: check and send with proper endianness
-    memcpy(buffer, &trade, sizeof(trade));
-    int p = write(socket, buffer, bytes_sent);
+
+    // TODO: improve memory usage here
+    char buffer[sizeof(trade)];
+    char *pos = buffer;
+    *(uint64_t*)pos = htonll(trade.timestamp);
+    pos += sizeof(uint64_t);
+    *(uint64_t*)pos = htonll(trade.symbol);
+    pos += sizeof(uint64_t);
+    *(int32_t*)pos = htonl(trade.price_c);
+    pos += sizeof(int32_t);
+    *(uint32_t*)pos = htonl(trade.qty);
+    pos += sizeof(uint32_t);
+
+    // send(0, buffer, (int)(pos - buffer), 0);
+    int p = write(socket, buffer, (int)(pos - buffer));
     if (p < 0) {
     }
 }
