@@ -105,7 +105,7 @@ void Server::send_market_data(int socket) {
             default:
                 break;
         }
-        unsigned int delay_us = delay_range(gen) * 10000;
+        unsigned int delay_us = delay_range(gen) * 1000;
         usleep(delay_us);
     }
 }
