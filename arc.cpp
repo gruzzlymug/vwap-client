@@ -13,9 +13,8 @@
 #include <inttypes.h>
 
 #ifdef __APPLE__
-#pragma message "APPLE"
 #elif __linux__
-#pragma message "LINUX"
+#include "ntohll.cpp"
 #else
 #pragma message "UNKNOWN COMPILER"
 #endif

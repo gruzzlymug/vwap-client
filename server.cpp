@@ -10,6 +10,13 @@
 #include <netinet/in.h>
 #include <signal.h>
 
+#ifdef __APPLE__
+#elif __linux__
+#include "ntohll.cpp"
+#else
+#pragma message "UNKNOWN COMPILER"
+#endif
+
 using namespace std::chrono;
 
 Server::Server(int mode)
