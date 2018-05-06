@@ -10,6 +10,13 @@
 #include <netinet/in.h>
 #include <signal.h>
 
+#ifdef __APPLE__
+#elif __linux__
+#include "ntohll.cpp"
+#else
+#pragma message "UNKNOWN COMPILER"
+#endif
+
 using namespace std::chrono;
 
 Server::Server(int mode)
@@ -60,14 +67,14 @@ void Server::listen() {
         if (pid == 0) {
             close(sockfd);
             switch (mode) {
-            case 0:
-                send_market_data(newsockfd);
-                break;
-            case 1:
-                //accept_orders(newsockfd);
-                break;
-            default:
-                printf("BAD MODE %d\n", mode);
+                case 0:
+                    send_market_data(newsockfd);
+                    break;
+                case 1:
+                    //accept_orders(newsockfd);
+                    break;
+                default:
+                    printf("BAD MODE %d\n", mode);
             }
             exit(0);
         } else {
@@ -79,7 +86,6 @@ void Server::listen() {
 void Server::stop() {
     done = true;
 }
-
 
 void Server::send_market_data(int socket) {
     std::random_device rd;
@@ -99,7 +105,7 @@ void Server::send_market_data(int socket) {
             default:
                 break;
         }
-        unsigned int delay_us = delay_range(gen) * 1000;
+        unsigned int delay_us = delay_range(gen) * 10000;
         usleep(delay_us);
     }
 }
@@ -120,26 +126,33 @@ int Server::read_bytes(int socket, unsigned int num_to_read, char *buffer) {
 void Server::send_quote(int socket) {
     std::random_device rd;
     std::mt19937 gen(rd());
-    std::uniform_int_distribution<> price_range(1, 60);
+    std::uniform_int_distribution<> price_range(-25, 25);
     std::uniform_int_distribution<> contract_range(1, 13);
     std::uniform_int_distribution<> side_range(0, 1);
 
-    unsigned char spread = 10;
+    uint64_t now_ns = duration_cast<nanoseconds>(high_resolution_clock::now().time_since_epoch()).count();
+
+    uint64_t now_s = now_ns / 1000000000;
+    uint16_t offset = now_s % 6283;
+    int32_t trend = sin(offset / 3141.5f) * 250;
+    int32_t price_c = 991330 + trend + price_range(gen) * 2;
+
+    char range = price_range(gen);
+    char spread = 10;
 
     Quote quote;
-    uint64_t now_ns = duration_cast<nanoseconds>(high_resolution_clock::now().time_since_epoch()).count();
     quote.timestamp = now_ns;
     bzero(quote.symbol, 8);
     strncpy(quote.symbol, "BTC.USD", strlen("BTC.USD"));
-    quote.bid_price_c = 991230 + price_range(gen) - spread;
+    quote.bid_price_c = price_c + range - spread;
     quote.bid_qty = contract_range(gen);
-    quote.ask_price_c = 991230 + price_range(gen) + spread;
+    quote.ask_price_c = price_c + range + spread;
     quote.ask_qty = contract_range(gen);
 
     char buffer[256];
     unsigned char quote_size = sizeof(quote);
 
-    printf("Sending Quote\n");
+    // printf("Sending Quote\n");
     buffer[0] = quote_size;
     buffer[1] = 0x01;
     int n = write(socket, buffer, 2);
@@ -154,41 +167,59 @@ void Server::send_quote(int socket) {
 void Server::send_trade(int socket) {
     std::random_device rd;
     std::mt19937 gen(rd());
-    std::uniform_int_distribution<> price_range(-100, 100);
+    std::uniform_int_distribution<> price_range(-10, 10);
     std::uniform_int_distribution<> contract_range(1, 13);
     std::uniform_int_distribution<> symbol_range(0, 2);
 
-    Trade trade;
     uint64_t now_ns = duration_cast<nanoseconds>(high_resolution_clock::now().time_since_epoch()).count();
-    trade.timestamp = now_ns;
-    bzero(trade.symbol, 8);
+    uint64_t timestamp = now_ns;
+    uint64_t symbol = 0;
+    int32_t price_c = 0;
     switch (symbol_range(gen)) {
-        case 0:
-            strncpy(trade.symbol, "BTC.USD", strlen("BTC.USD")) ;
-            trade.price_c = 991330 + price_range(gen) * 2;
+        case 0: {
+            uint64_t now_s = now_ns / 1000000000;
+            uint16_t offset = now_s % 6283;
+            int32_t trend = sin(offset / 3141.5f) * 250;
+
+            strncpy((char *)&symbol, "BTC.USD", strlen("BTC.USD")) ;
+            price_c = 991330 + trend + price_range(gen) * 2;
             break;
+        }
         case 1:
-            strncpy(trade.symbol, "ETH.USD", strlen("ETH.USD")) ;
-            trade.price_c = 82050 + price_range(gen);
+            strncpy((char *)&symbol, "ETH.USD", strlen("ETH.USD")) ;
+            price_c = 82050 + price_range(gen);
             break;
         default:
-            strncpy(trade.symbol, "XYZ.USD", strlen("XYZ.USD")) ;
-            trade.price_c = 1000 + price_range(gen);
+            strncpy((char *)&symbol, "XYZ.USD", strlen("XYZ.USD")) ;
+            price_c = 1000 + price_range(gen);
     }
-    trade.qty = contract_range(gen);
+    uint32_t qty = contract_range(gen);
+    Trade trade(timestamp, symbol, price_c, qty);
 
-    char buffer[64];
+    char header[2];
     unsigned char bytes_sent = sizeof(trade);
 
-    printf("Sending Trade\n");
-    buffer[0] = bytes_sent;
-    buffer[1] = 0x02;
-    int n = write(socket, buffer, 2);
+    // printf("Sending Trade\n");
+    header[0] = bytes_sent;
+    header[1] = 0x02;
+    int n = write(socket, header, 2);
     if (n < 0) {
     }
-    // TODO: check and send with proper endianness
-    memcpy(buffer, &trade, sizeof(trade));
-    int p = write(socket, buffer, bytes_sent);
+
+    // TODO: improve memory usage here
+    char buffer[sizeof(trade)];
+    char *pos = buffer;
+    *(uint64_t*)pos = htonll(trade.timestamp);
+    pos += sizeof(uint64_t);
+    *(uint64_t*)pos = htonll(trade.symbol);
+    pos += sizeof(uint64_t);
+    *(int32_t*)pos = htonl(trade.price_c);
+    pos += sizeof(int32_t);
+    *(uint32_t*)pos = htonl(trade.qty);
+    pos += sizeof(uint32_t);
+
+    // send(0, buffer, (int)(pos - buffer), 0);
+    int p = write(socket, buffer, (int)(pos - buffer));
     if (p < 0) {
     }
 }

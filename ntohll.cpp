@@ -1,3 +1,6 @@
+#include <cstdint>
+
+// https://ubuntuforums.org/showthread.php?t=1190710
 uint64_t ntohll(const uint64_t value) {
     enum { TYP_INIT, TYP_SMLE, TYP_BIGE };
 
@@ -37,4 +40,3 @@ uint64_t ntohll(const uint64_t value) {
 uint64_t htonll(const uint64_t value) {
     return ntohll(value);
 }
-
