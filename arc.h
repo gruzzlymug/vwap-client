@@ -18,6 +18,7 @@ struct ArcConfig {
 
 class Arc {
     static ArcConfig config;
+    static bool initializing;
     static struct sockaddr_in serv_addr;
     static int64_t vwap;
     static std::vector<Trade> trades;
