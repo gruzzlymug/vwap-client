@@ -12,6 +12,14 @@
 #define __STDC_FORMAT_MACROS
 #include <inttypes.h>
 
+#ifdef __APPLE__
+#pragma message "APPLE"
+#elif __linux__
+#pragma message "LINUX"
+#else
+#pragma message "UNKNOWN COMPILER"
+#endif
+
 using namespace std::chrono;
 
 ArcConfig Arc::config;
