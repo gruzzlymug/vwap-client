@@ -10,6 +10,13 @@
 #include <netinet/in.h>
 #include <signal.h>
 
+#ifdef __APPLE__
+#elif __linux__
+#include "ntohll.cpp"
+#else
+#pragma message "UNKNOWN COMPILER"
+#endif
+
 using namespace std::chrono;
 
 Server::Server(int mode)
@@ -187,7 +194,6 @@ void Server::send_trade(int socket) {
             price_c = 1000 + price_range(gen);
     }
     uint32_t qty = contract_range(gen);
-
     Trade trade(timestamp, symbol, price_c, qty);
 
     char header[2];
