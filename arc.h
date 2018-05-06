@@ -21,7 +21,7 @@ class Arc {
     static struct sockaddr_in serv_addr;
     static int64_t vwap;
     static std::vector<Trade> trades;
-    // static std::vector<Quote> quotes;
+    static Quote quote;
 
     static int read_bytes(int socket, unsigned int num_to_read, char *buffer);
 

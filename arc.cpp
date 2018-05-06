@@ -18,7 +18,7 @@ ArcConfig Arc::config;
 struct sockaddr_in Arc::serv_addr;
 int64_t Arc::vwap = INTMAX_MAX;
 std::vector<Trade> Arc::trades;
-// std::vector<Quote> Arc::quotes;
+Quote Arc::quote;
 
 Arc::Arc() {
 }
@@ -105,9 +105,9 @@ int Arc::stream_market_data(int socket) {
             if (strncmp(quote.symbol, config.symbol, strlen(config.symbol)) == 0) {
                 printf("q> %" PRIx64 " %7s $%8d x %3d, $%8d x %3d\n", quote.timestamp, quote.symbol, quote.bid_price_c, quote.bid_qty, quote.ask_price_c, quote.ask_qty);
                 if (config.side == 'B' && (quote.ask_price_c * 100 <= vwap)) {
-                    //printf("BUY\n");
+                    printf("BUY: %" PRIi64 "\n", (vwap - quote.ask_price_c * 100));
                 } else if (config.side == 'S' && (quote.bid_price_c * 100 >= vwap)) {
-                    //printf("SELL\n");
+                    printf("SELL: %" PRIi64 "\n", (vwap - quote.bid_price_c * 100));
                 }
             }
             break;
@@ -134,7 +134,7 @@ int Arc::stream_market_data(int socket) {
             uint64_t period_ns = config.vwap_period_s * 1000000000;
             uint64_t cutoff_ns = now_ns - period_ns;
             trades.erase(std::remove_if(trades.begin(), trades.end(), [cutoff_ns](Trade &t) { return t.timestamp < cutoff_ns; }), trades.end());
-            printf("t> %" PRIx64 " %7s $%8d x %3d\n", timestamp, (const char *)&symbol, price_c, qty);
+            // printf("t> %" PRIx64 " %7s $%8d x %3d\n", timestamp, (const char *)&symbol, price_c, qty);
             break;
         }
         default:
