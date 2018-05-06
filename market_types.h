@@ -7,26 +7,26 @@ struct Header {
 };
 
 struct Common {
-    unsigned long timestamp;
+    uint64_t timestamp;
     char symbol[8];
-    int price_c;
-    unsigned int qty;
+    int32_t price_c;
+    uint32_t qty;
 };
 
 struct Quote {
-    unsigned long timestamp;
+    uint64_t timestamp;
     char symbol[8];
-    int bid_price_c;
-    unsigned int bid_qty;
-    int ask_price_c;
-    unsigned int ask_qty;
+    int32_t bid_price_c;
+    uint32_t bid_qty;
+    int32_t ask_price_c;
+    uint32_t ask_qty;
 };
 
 struct Trade {
-    unsigned long timestamp;
+    uint64_t timestamp;
     char symbol[8];
-    int price_c;
-    unsigned int qty;
+    int32_t price_c;
+    uint32_t qty;
 };
 
 struct Order {

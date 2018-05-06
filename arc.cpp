@@ -70,8 +70,9 @@ int Arc::calc_vwap() {
         uint64_t period_ns = config.vwap_period_s * 1000000000;
         int64_t total_spent = 0;
         int64_t total_contracts = 0;
+        uint64_t cutoff_ns = now_ns - period_ns;
         for (auto t : trades) {
-            if (now_ns - period_ns < t.timestamp) {
+            if (t.timestamp > cutoff_ns) {
                 total_spent += t.price_c * t.qty * 100;
                 total_contracts += t.qty;
                 //printf("v> %lx %lx %7s %8d %4d\n", now_ns, t.timestamp, t.symbol, t.price_c, t.qty);
@@ -102,7 +103,7 @@ int Arc::stream_market_data(int socket) {
             read_bytes(socket, length, buffer);
             memcpy(&quote, buffer, sizeof(quote));
             if (strncmp(quote.symbol, config.symbol, strlen(config.symbol)) == 0) {
-                printf("q> %lx %7s $%8d x %3d, $%8d x %3d\n", quote.timestamp, quote.symbol, quote.bid_price_c, quote.bid_qty, quote.ask_price_c, quote.ask_qty);
+                printf("q> %" PRIx64 " %7s $%8d x %3d, $%8d x %3d\n", quote.timestamp, quote.symbol, quote.bid_price_c, quote.bid_qty, quote.ask_price_c, quote.ask_qty);
                 if (config.side == 'B' && (quote.ask_price_c * 100 <= vwap)) {
                     //printf("BUY\n");
                 } else if (config.side == 'S' && (quote.bid_price_c * 100 >= vwap)) {
@@ -124,7 +125,7 @@ int Arc::stream_market_data(int socket) {
             uint64_t period_ns = config.vwap_period_s * 1000000000;
             uint64_t cutoff_ns = now_ns - period_ns;
             trades.erase(std::remove_if(trades.begin(), trades.end(), [cutoff_ns](Trade &t) { return t.timestamp < cutoff_ns; }), trades.end());
-            printf("t> %lx %7s $%8d x %3d\n", trade.timestamp, trade.symbol, trade.price_c, trade.qty);
+            printf("t> %" PRIx64 " %7s $%8d x %3d\n", trade.timestamp, trade.symbol, trade.price_c, trade.qty);
             break;
         }
         default:
