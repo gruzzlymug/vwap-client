@@ -18,6 +18,7 @@ ArcConfig Arc::config;
 struct sockaddr_in Arc::serv_addr;
 int64_t Arc::vwap = INTMAX_MAX;
 std::vector<Trade> Arc::trades;
+// std::vector<Quote> Arc::quotes;
 
 Arc::Arc() {
 }
@@ -47,7 +48,7 @@ int Arc::send_order_data(int socket) {
     char buffer[256];
     bzero(buffer, 256);
 
-    printf("piping order data\n");
+    printf("sending order data\n");
     if (vwap < 0) {
         Order order;
         unsigned char bytes_sent = sizeof(order);
@@ -58,7 +59,6 @@ int Arc::send_order_data(int socket) {
 
         read_bytes(socket, 32, buffer);
         memcpy(&order, buffer, sizeof(order));
-        // TODO: deal with 7 char ticker
         printf("o> %" PRIu64 " %7s %c $%d x %d\n", order.timestamp, order.symbol, order.side, order.price_c, order.qty);
     }
     return 0;
@@ -75,16 +75,16 @@ int Arc::calc_vwap() {
             if (t.timestamp > cutoff_ns) {
                 total_spent += t.price_c * t.qty * 100;
                 total_contracts += t.qty;
-                //printf("v> %lx %lx %7s %8d %4d\n", now_ns, t.timestamp, t.symbol, t.price_c, t.qty);
+                // printf("v> %" PRIx64 " %" PRIx64 " %7s %8d %4d\n", now_ns, t.timestamp, (char *)&t.symbol, t.price_c, t.qty);
             } else {
-                //printf("_> %lx %lx %7s %8d %4d\n", now_ns, t.timestamp, t.symbol, t.price_c, t.qty);
+                // printf("_> %" PRIx64 " %" PRIx64 " %7s %8d %4d\n", now_ns, t.timestamp, (char *)&t.symbol, t.price_c, t.qty);
             }
         }
         if (total_contracts > 0) {
             vwap = total_spent / total_contracts;
         }
         printf("vwap = %" PRIu64 "\n", vwap);
-        sleep(1);
+        usleep(500000);
     }
 }
 
@@ -113,19 +113,28 @@ int Arc::stream_market_data(int socket) {
             break;
         }
         case 2: {
-            Trade trade;
+            // char buffer[sizeof(Trade)];
             read_bytes(socket, length, buffer);
-            memcpy(&trade, buffer, sizeof(trade));
-            if (strncmp(trade.symbol, config.symbol, strlen(trade.symbol)) == 0) {
-                // TODO: emplace_back, custom allocator
-                trades.push_back(trade);
+            char *pos = buffer;
+            uint64_t timestamp = ntohll(*(uint64_t*)pos);
+            pos += sizeof(uint64_t);
+            uint64_t symbol = ntohll(*(uint64_t*)pos);
+            pos += sizeof(uint64_t);
+            int32_t price_c = ntohl(*(int32_t*)pos);
+            pos += sizeof(int32_t);
+            uint32_t qty = ntohl(*(int32_t*)pos);
+            pos += sizeof(uint32_t);
+
+            if (strncmp((const char *)&symbol, config.symbol, strlen(config.symbol)) == 0) {
+                // TODO: custom allocator
+                trades.emplace_back(timestamp, symbol, price_c, qty);
             }
 
             uint64_t now_ns = duration_cast<nanoseconds>(high_resolution_clock::now().time_since_epoch()).count();
             uint64_t period_ns = config.vwap_period_s * 1000000000;
             uint64_t cutoff_ns = now_ns - period_ns;
             trades.erase(std::remove_if(trades.begin(), trades.end(), [cutoff_ns](Trade &t) { return t.timestamp < cutoff_ns; }), trades.end());
-            printf("t> %" PRIx64 " %7s $%8d x %3d\n", trade.timestamp, trade.symbol, trade.price_c, trade.qty);
+            printf("t> %" PRIx64 " %7s $%8d x %3d\n", timestamp, (const char *)&symbol, price_c, qty);
             break;
         }
         default:
