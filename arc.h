@@ -2,7 +2,6 @@
 #include "market_types.h"
 
 #include <vector>
-#include <netinet/in.h>
 
 struct ArcConfig {
     char symbol[8];
