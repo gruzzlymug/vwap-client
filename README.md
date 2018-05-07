@@ -36,7 +36,7 @@ Supply an IP Address and 2 Ports (market data server, quote acceptor)
 Example Output
 
 ```
-❯ ./start_arc 127.0.0.1 8080 9090                                                                                               
+❯ ./start_arc 127.0.0.1 8081 9091                                                                                               
 Connecting to 127.0.0.1
 Connecting to 127.0.0.1
 INITIALIZING
