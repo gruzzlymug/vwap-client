@@ -10,6 +10,9 @@
 #include <netinet/in.h>
 #include <signal.h>
 
+#define __STDC_FORMAT_MACROS
+#include <inttypes.h>
+
 #ifdef __APPLE__
 #elif __linux__
 #include "ntohll.cpp"
@@ -58,7 +61,7 @@ void Server::listen() {
             perror("ERROR on accept");
             return;
         }
-        printf("-\n");
+
         int pid = fork();
         if (pid < 0) {
             perror("ERROR on fork");
@@ -71,7 +74,7 @@ void Server::listen() {
                     send_market_data(newsockfd);
                     break;
                 case 1:
-                    //accept_orders(newsockfd);
+                    accept_orders(newsockfd);
                     break;
                 default:
                     printf("BAD MODE %d\n", mode);
@@ -142,8 +145,8 @@ void Server::send_quote(int socket) {
 
     Quote quote;
     quote.timestamp = now_ns;
-    bzero(quote.symbol, 8);
-    strncpy(quote.symbol, "BTC.USD", strlen("BTC.USD"));
+    quote.symbol = 0;
+    strncpy((char *)&quote.symbol, "BTC.USD", strlen("BTC.USD"));
     quote.bid_price_c = price_c + range - spread;
     quote.bid_qty = contract_range(gen);
     quote.ask_price_c = price_c + range + spread;
@@ -206,7 +209,7 @@ void Server::send_trade(int socket) {
     if (n < 0) {
     }
 
-    // TODO: improve memory usage here
+    // TODO: clean up buffer use
     char buffer[sizeof(trade)];
     char *pos = buffer;
     *(uint64_t*)pos = htonll(trade.timestamp);
@@ -228,11 +231,26 @@ void Server::accept_orders(int socket) {
     char buffer[256];
     Order order;
 
-    printf("Accepting Order\n");
-    unsigned char bytes_needed = sizeof(order);
-    int n = read_bytes(socket, bytes_needed, buffer);
-    if (n > 0) {
-        memcpy(buffer, &order, bytes_needed);
+    printf("Accepting Orders\n");
+    unsigned char bytes_needed = 25; //sizeof(order);
+
+    while (true) {
+        int n = read_bytes(socket, bytes_needed, buffer);
+        if (n == 0) {
+            char *pos = buffer;
+
+            order.timestamp = ntohll(*(uint64_t*)pos);
+            pos += sizeof(uint64_t);
+            order.symbol = ntohll(*(uint64_t*)pos);
+            pos += sizeof(uint64_t);
+            order.side = *(uint8_t*)pos;
+            pos += sizeof(uint8_t);
+            order.price_c = ntohl(*(int32_t*)pos);
+            pos += sizeof(int32_t);
+            order.qty = ntohl(*(int32_t*)pos);
+            pos += sizeof(uint32_t);
+
+            printf("o> %" PRIx64 " %7s %c $%8d x %4d\n", order.timestamp, (char *)&order.symbol, order.side, order.price_c, order.qty);
+        }
     }
 }
-

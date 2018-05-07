@@ -15,7 +15,7 @@ int main(int argc, char** argv) {
 
     strncpy(config.symbol, "BTC.USD", sizeof("BTC.USD"));
     config.side = 'S';
-    config.qty_max = 4;
+    config.qty_max = 10;
     config.vwap_period_s = 30;
     config.order_timeout_s = 5;
     strncpy(config.market_server_ip, argv[1], strlen(argv[1]));
