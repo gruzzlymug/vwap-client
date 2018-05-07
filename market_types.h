@@ -8,7 +8,7 @@ struct Header {
 
 struct Quote {
     uint64_t timestamp;
-    char symbol[8];
+    uint64_t symbol;
     int32_t bid_price_c;
     uint32_t bid_qty;
     int32_t ask_price_c;
@@ -30,7 +30,7 @@ struct Trade {
 
 struct Order {
     uint64_t timestamp;
-    char symbol[8];
+    uint64_t symbol;
     int32_t price_c;
     uint32_t qty;
     char side;
