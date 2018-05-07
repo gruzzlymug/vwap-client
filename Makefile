@@ -1,10 +1,9 @@
 CC=g++
 CFLAGS=-g -c -Wall -std=c++14
-#ifdef __APPLE__
-#LDFLAGS=
-#elif __linux__
-LDFLAGS=-pthread
-#endif
+LDFLAGS=
+ifeq ($(UNAME_S),Linux)
+	LDFLAGS += -pthread
+endif
 CLIENT_SOURCES=start_arc.cpp arc.cpp
 CLIENT_OBJECTS=$(CLIENT_SOURCES:.cpp=.o)
 CLIENT_EXECUTABLE=start_arc
