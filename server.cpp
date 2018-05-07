@@ -161,7 +161,21 @@ void Server::send_quote(int socket) {
     int n = write(socket, buffer, 2);
     if (n < 0) {
     }
-    memcpy(buffer, &quote, quote_size);
+
+    char *pos = buffer;
+    *(uint64_t*)pos = htonll(quote.timestamp);
+    pos += sizeof(uint64_t);
+    *(uint64_t*)pos = htonll(quote.symbol);
+    pos += sizeof(uint64_t);
+    *(int32_t*)pos = htonl(quote.bid_price_c);
+    pos += sizeof(int32_t);
+    *(uint32_t*)pos = htonl(quote.bid_qty);
+    pos += sizeof(uint32_t);
+    *(int32_t*)pos = htonl(quote.ask_price_c);
+    pos += sizeof(int32_t);
+    *(uint32_t*)pos = htonl(quote.ask_qty);
+    pos += sizeof(uint32_t);
+
     int p = write(socket, buffer, quote_size);
     if (p < 0) {
     }

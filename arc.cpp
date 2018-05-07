@@ -68,7 +68,19 @@ int Arc::stream_market_data(int socket) {
         case 1: {
             Quote quote;
             read_bytes(socket, length, buffer);
-            memcpy(&quote, buffer, sizeof(quote));
+            char *pos = buffer;
+            quote.timestamp = ntohll(*(uint64_t*)pos);
+            pos += sizeof(uint64_t);
+            quote.symbol = ntohll(*(uint64_t*)pos);
+            pos += sizeof(uint64_t);
+            quote.bid_price_c = ntohl(*(int32_t*)pos);
+            pos += sizeof(int32_t);
+            quote.bid_qty = ntohl(*(uint32_t*)pos);
+            pos += sizeof(uint32_t);
+            quote.ask_price_c = ntohl(*(int32_t*)pos);
+            pos += sizeof(int32_t);
+            quote.ask_qty = ntohl(*(uint32_t*)pos);
+            pos += sizeof(uint32_t);
 
             uint64_t now_ns = duration_cast<nanoseconds>(high_resolution_clock::now().time_since_epoch()).count();
             bool order_timeout_expired = now_ns > (last_order_ns + order_timeout_ns);
@@ -113,7 +125,7 @@ int Arc::stream_market_data(int socket) {
             pos += sizeof(uint64_t);
             int32_t price_c = ntohl(*(int32_t*)pos);
             pos += sizeof(int32_t);
-            uint32_t qty = ntohl(*(int32_t*)pos);
+            uint32_t qty = ntohl(*(uint32_t*)pos);
             pos += sizeof(uint32_t);
 
             if (strncmp((const char *)&symbol, config.symbol, strlen(config.symbol)) == 0) {
@@ -192,8 +204,8 @@ int Arc::calc_vwap() {
 }
 
 int Arc::send_order_data(int socket) {
-    char buffer[256];
-    bzero(buffer, 256);
+    char buffer[25];
+    bzero(buffer, 25);
 
     uint64_t cutoff_ns = 0;
     while (true) {
@@ -242,7 +254,6 @@ int Arc::connect(char *hostname, int port) {
     }
 
     printf("Connecting to %s\n", hostname);
-    // TODO: gethostbyname / getnameinfo?
     struct hostent *server = gethostbyname(hostname);
     if (server == NULL) {
         fprintf(stderr, "ERROR no such host\n");
