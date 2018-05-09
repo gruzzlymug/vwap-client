@@ -27,7 +27,7 @@ o> 9adf61e00e7e0 BTC.USD S $  991605 x    4
 
 To start the algorithm:
 
-Supply an IP Address and 2 Ports (market data server, quote acceptor)
+Supply an IP Address and 2 Ports (market data server, order placement)
 
 ```
 ./start_arc 127.0.0.1 8081 9091
