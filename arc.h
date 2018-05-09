@@ -17,12 +17,12 @@ struct ArcConfig {
 };
 
 class Arc {
-    static ArcConfig config;
-    static bool initializing;
-    static struct sockaddr_in serv_addr;
-    static int64_t vwap;
-    static std::vector<Trade> trades;
-    static std::vector<Order> orders;
+    static ArcConfig config_;
+    static bool initializing_;
+    static struct sockaddr_in serv_addr_;
+    static int64_t vwap_;
+    static std::vector<Trade> trades_;
+    static std::vector<Order> orders_;
 
     static int stream_market_data(int socket);
     static int calc_vwap();
@@ -34,5 +34,5 @@ class Arc {
 public:
     Arc();
     ~Arc();
-    int start(ArcConfig *new_config);
+    int start(ArcConfig *config);
 };
