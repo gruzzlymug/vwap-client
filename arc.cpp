@@ -26,8 +26,12 @@ ArcConfig Arc::config_;
 atomic<Arc::State> Arc::state_ {Arc::State::INIT};
 struct sockaddr_in Arc::serv_addr_;
 int64_t Arc::vwap_ = 0;
-vector<Trade> Arc::trades_;
 vector<Order> Arc::orders_;
+
+const int Arc::max_trades;
+Trade Arc::all_trades[2 * max_trades];
+uint16_t Arc::t_first = 0;
+uint16_t Arc::t_next = 0;
 
 Arc::Arc() {
 }
@@ -35,10 +39,13 @@ Arc::Arc() {
 Arc::~Arc() {
 }
 
-int Arc::start(ArcConfig *new_config) {
+int Arc::start(ArcConfig *config) {
+    // printf("%llx:%llx\n",
+    //     (unsigned long long)all_trades,
+    //     (unsigned long long)(all_trades + (2 * max_trades - 1)));
     //printf("%s:%d\n", config.market_server_ip, config.market_server_port);
     //printf("%s:%d\n", config.order_server_ip, config.order_server_port);
-    memcpy(&config_, new_config, sizeof(ArcConfig));
+    memcpy(&config_, config, sizeof(ArcConfig));
 
     int market_socket = connect(config_.market_server_ip, config_.market_server_port);
     int order_socket = connect(config_.order_server_ip, config_.order_server_port);
@@ -66,6 +73,7 @@ int Arc::stream_market_data(int socket) {
         unsigned int length = (unsigned char) buffer[0];
         unsigned int message_type = (unsigned char) buffer[1];
         //printf("-> %d %d\n", length, message_type);
+        uint64_t now_ns = duration_cast<nanoseconds>(high_resolution_clock::now().time_since_epoch()).count();
         switch (message_type) {
         case 1: {
             Quote quote;
@@ -84,7 +92,6 @@ int Arc::stream_market_data(int socket) {
             quote.ask_qty = ntohl(*(uint32_t*)pos);
             pos += sizeof(uint32_t);
 
-            uint64_t now_ns = duration_cast<nanoseconds>(high_resolution_clock::now().time_since_epoch()).count();
             bool order_timeout_expired = now_ns > (last_order_ns + order_timeout_ns);
             bool can_order = state_ == Arc::State::RUN && order_timeout_expired;
             if (!order_timeout_expired) {
@@ -130,12 +137,37 @@ int Arc::stream_market_data(int socket) {
             uint32_t qty = ntohl(*(uint32_t*)pos);
             pos += sizeof(uint32_t);
 
-            if (strncmp((const char *)&symbol, config_.symbol, strlen(config_.symbol)) == 0) {
-                // TODO: custom allocator / array
-                trades_.emplace_back(timestamp, symbol, price_c, qty);
+            // TODO precalculate and remove duplication
+            uint64_t period_ns = config_.vwap_period_s * 1000000000;
+            uint64_t cutoff_ns = now_ns - period_ns;
+            for (uint16_t idx_trade = t_first; idx_trade < t_next; ++idx_trade) {
+                Trade *tp = (Trade *)(all_trades + idx_trade);
+                if (tp->timestamp < cutoff_ns) {
+                    ++t_first;
+                }
             }
 
-            // printf("t> %" PRIx64 " %7s $%8d x %3d\n", timestamp, (const char *)&symbol, price_c, qty);
+            if (t_first > max_trades) {
+                // TODO bug if t_next wraps before copy
+                memcpy(all_trades, all_trades + t_first, (t_next - t_first) * sizeof(Trade));
+                t_next -= t_first;
+                t_first = 0;
+            }
+
+            if (strncmp((const char *)&symbol, config_.symbol, strlen(config_.symbol)) == 0) {
+                void *vp = all_trades + t_next;
+                // printf("%4d %llx\n", (int) t_next, (unsigned long long) vp);
+                Trade *tp = new(vp) Trade;
+                tp->timestamp = timestamp;
+                tp->symbol = symbol;
+                tp->price_c = price_c;
+                tp->qty = qty;
+                // printf("t> %" PRIx64 " %7s $%8d x %3d\n", tp->timestamp, (const char *)&tp->symbol, tp->price_c, tp->qty);
+
+                ++t_next;
+                t_next %= (max_trades * 2);
+            }
+
             break;
         }
         default:
@@ -146,6 +178,7 @@ int Arc::stream_market_data(int socket) {
 }
 
 int Arc::calc_vwap() {
+    // TODO precalculate
     uint64_t period_ns = config_.vwap_period_s * 1000000000;
     uint64_t earliest_ns = 0;
 
@@ -153,27 +186,27 @@ int Arc::calc_vwap() {
     while (state_ == Arc::State::INIT) {
         usleep(500);
         if (earliest_ns == 0) {
-            if (trades_.size() > 0) {
-                auto t = trades_.front();
-                earliest_ns = t.timestamp;
-                printf("0> %" PRIx64 " %" PRIx64 " %7s %8d %4d\n", earliest_ns, t.timestamp, (char *)&t.symbol, t.price_c, t.qty);
+            if (t_next > t_first) {
+                Trade *tp = &all_trades[0];
+                earliest_ns = tp->timestamp;
+                printf("0> %" PRIx64 " %" PRIx64 " %7s %8d %4d\n", earliest_ns, tp->timestamp, (char *)&tp->symbol, tp->price_c, tp->qty);
             } else {
                 continue;
             }
         }
 
         uint64_t cutoff_ns = earliest_ns + period_ns;
-        auto t = trades_.back();
-        uint64_t newest_ns = t.timestamp;
+        Trade *tp = &all_trades[t_next - 1];
+        uint64_t newest_ns = tp->timestamp;
         if (newest_ns > cutoff_ns) {
             int64_t total_spent = 0;
             int64_t total_contracts = 0;
-            for (auto it_trade = trades_.rbegin(); it_trade != trades_.rend(); ++it_trade) {
-                total_spent += it_trade->price_c * it_trade->qty * 100;
-                total_contracts += it_trade->qty;
+            for (uint16_t idx_trade = t_next - 1; idx_trade != t_first; --idx_trade) {
+                total_spent += all_trades[idx_trade].price_c * all_trades[idx_trade].qty * 100;
+                total_contracts += all_trades[idx_trade].qty;
             }
             vwap_ = total_spent / total_contracts;
-            printf("1> %" PRIx64 " %" PRIx64 " %7s %8d %4d\n", earliest_ns, t.timestamp, (char *)&t.symbol, t.price_c, t.qty);
+            printf("1> %" PRIx64 " %" PRIx64 " %7s %8d %4d\n", earliest_ns, tp->timestamp, (char *)&tp->symbol, tp->price_c, tp->qty);
             state_ = Arc::State::RUN;
         }
     }
@@ -184,21 +217,18 @@ int Arc::calc_vwap() {
         int64_t total_spent = 0;
         int64_t total_contracts = 0;
         uint64_t cutoff_ns = now_ns - period_ns;
-        for (auto t : trades_) {
-            if (t.timestamp > cutoff_ns) {
-                total_spent += t.price_c * t.qty * 100;
-                total_contracts += t.qty;
-                // printf("v> %" PRIx64 " %" PRIx64 " %7s %8d %4d\n", now_ns, t.timestamp, (char *)&t.symbol, t.price_c, t.qty);
-            } else {
-                // printf("_> %" PRIx64 " %" PRIx64 " %7s %8d %4d\n", now_ns, t.timestamp, (char *)&t.symbol, t.price_c, t.qty);
+        for (uint16_t idx_trade = t_first; idx_trade < t_next; ++idx_trade) {
+            Trade *tp = (Trade *)(all_trades + idx_trade);
+            if (tp->timestamp > cutoff_ns) {
+                total_spent += tp->price_c * tp->qty * 100;
+                total_contracts += tp->qty;
             }
+            // printf("v> %4d %" PRIx64 " %" PRIx64 " %s %8d %4d\n", t_first, now_ns, tp->timestamp, (char *)&tp->symbol, tp->price_c, tp->qty);
         }
         if (total_contracts > 0) {
             vwap_ = total_spent / total_contracts;
         }
         printf("vwap = %" PRIu64 "\n", vwap_);
-
-        trades_.erase(remove_if(trades_.begin(), trades_.end(), [cutoff_ns](Trade &t) { return t.timestamp < cutoff_ns; }), trades_.end());
 
         usleep(500000);
     }

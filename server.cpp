@@ -189,29 +189,27 @@ void Server::send_trade(int socket) {
     std::uniform_int_distribution<> symbol_range(0, 2);
 
     uint64_t now_ns = duration_cast<nanoseconds>(high_resolution_clock::now().time_since_epoch()).count();
-    uint64_t timestamp = now_ns;
-    uint64_t symbol = 0;
-    int32_t price_c = 0;
+    Trade trade;
+    trade.timestamp = now_ns;
     switch (symbol_range(gen)) {
         case 0: {
             uint64_t now_s = now_ns / 1000000000;
             uint16_t offset = now_s % 6283;
             int32_t trend = sin(offset / 3141.5f) * 250;
 
-            strncpy((char *)&symbol, "BTC.USD", strlen("BTC.USD")) ;
-            price_c = 991330 + trend + price_range(gen) * 2;
+            strncpy((char *)&trade.symbol, "BTC.USD", strlen("BTC.USD")) ;
+            trade.price_c = 991330 + trend + price_range(gen) * 2;
             break;
         }
         case 1:
-            strncpy((char *)&symbol, "ETH.USD", strlen("ETH.USD")) ;
-            price_c = 82050 + price_range(gen);
+            strncpy((char *)&trade.symbol, "ETH.USD", strlen("ETH.USD")) ;
+            trade.price_c = 82050 + price_range(gen);
             break;
         default:
-            strncpy((char *)&symbol, "XYZ.USD", strlen("XYZ.USD")) ;
-            price_c = 1000 + price_range(gen);
+            strncpy((char *)&trade.symbol, "XYZ.USD", strlen("XYZ.USD")) ;
+            trade.price_c = 1000 + price_range(gen);
     }
-    uint32_t qty = contract_range(gen);
-    Trade trade(timestamp, symbol, price_c, qty);
+    trade.qty = contract_range(gen);
 
     char header[2];
     unsigned char bytes_sent = sizeof(trade);

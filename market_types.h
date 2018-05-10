@@ -1,6 +1,8 @@
 #pragma once
 #include <cstdint>
 
+#include <stddef.h>
+
 struct Header {
     unsigned char length;
     unsigned char message_type;
@@ -15,17 +17,22 @@ struct Quote {
     uint32_t ask_qty;
 };
 
-struct Trade {
+class Trade {
+public:
     uint64_t timestamp;
     uint64_t symbol;
     int32_t price_c;
     uint32_t qty;
 
-    Trade(uint64_t t, uint64_t s, int32_t p, uint32_t q)
-        : timestamp(t), symbol(s), price_c(p), qty(q)
-    {
+    Trade() : timestamp(0), symbol(0), price_c(0), qty(0) {
     }
-    Trade& operator=(const Trade& other) = default;
+
+    void* operator new (size_t, void* buffer) {
+        return buffer;
+    }
+
+    void operator delete(void*, void*) {
+    }
 };
 
 struct Order {
