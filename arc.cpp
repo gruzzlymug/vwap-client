@@ -26,12 +26,18 @@ ArcConfig Arc::config_;
 atomic<Arc::State> Arc::state_ {Arc::State::INIT};
 struct sockaddr_in Arc::serv_addr_;
 int64_t Arc::vwap_ = 0;
-vector<Order> Arc::orders_;
 
 const int Arc::max_trades;
 Trade Arc::all_trades[2 * max_trades];
 uint16_t Arc::t_first = 0;
 uint16_t Arc::t_next = 0;
+
+const int Arc::max_orders;
+Order Arc::all_orders[2 * max_orders];
+uint16_t Arc::o_first = 0;
+uint16_t Arc::o_next = 0;
+
+uint64_t last_send_ns = 0;
 
 Arc::Arc() {
 }
@@ -108,19 +114,36 @@ int Arc::stream_market_data(int socket) {
                     action = config_.side;
                 }
                 if (action != 'X') {
-                    Order order;
-                    order.timestamp = quote.timestamp;
-                    order.symbol = quote.symbol;
-                    order.side = action;
-                    if (action == 'B') {
-                        order.price_c = quote.ask_price_c;
-                        order.qty = min(config_.qty_max, quote.ask_qty);
-                    } else {
-                        order.price_c = quote.bid_price_c;
-                        order.qty = min(config_.qty_max, quote.bid_qty);
+                    for (uint16_t idx_order = o_first; idx_order < o_next; ++idx_order) {
+                        Order *op = (Order *)(all_orders + idx_order);
+                        if (op->timestamp <= last_send_ns) {
+                            ++o_first;
+                        }
                     }
-                    orders_.push_back(order);
+
+                    if (o_first > max_orders) {
+                        // TODO bug if o_next wraps before copy
+                        memcpy(all_orders, all_orders + o_first, (o_next - o_first) * sizeof(Order));
+                        o_next -= o_first;
+                        o_first = 0;
+                    }
+
+                    void *vp = all_orders + o_next;
+                    Order *op = new(vp) Order;
+                    op->timestamp = quote.timestamp;
+                    op->symbol = quote.symbol;
+                    op->side = action;
+                    if (action == 'B') {
+                        op->price_c = quote.ask_price_c;
+                        op->qty = min(config_.qty_max, quote.ask_qty);
+                    } else {
+                        op->price_c = quote.bid_price_c;
+                        op->qty = min(config_.qty_max, quote.bid_qty);
+                    }
                     last_order_ns = now_ns;
+
+                    ++o_next;
+                    o_next %= (max_orders * 2);
                 }
             }
             break;
@@ -239,39 +262,37 @@ int Arc::send_order_data(int socket) {
     char buffer[25];
     bzero(buffer, 25);
 
-    uint64_t cutoff_ns = 0;
     while (state_ != Arc::State::QUIT) {
-        for (auto it_order = orders_.rbegin(); it_order != orders_.rend(); ++it_order) {
-            if (it_order->timestamp <= cutoff_ns) {
+        for (uint16_t idx_order = o_first; idx_order < o_next; ++idx_order) {
+            Order *op = (Order *)(all_orders + idx_order);
+            if (op->timestamp <= last_send_ns) {
                 continue;
             }
 
-            //printf(">> %" PRIx64 " %7s %c $%d x %d\n", it_order->timestamp, (char *)&it_order->symbol, it_order->side, it_order->price_c, it_order->qty);
+            printf(">> %" PRIx64 " %7s %c $%d x %d\n", op->timestamp, (char *)&op->symbol, op->side, op->price_c, op->qty);
 
             char buffer[25];
             char *pos = buffer;
-            *(uint64_t*)pos = htonll(it_order->timestamp);
+            *(uint64_t*)pos = htonll(op->timestamp);
             pos += sizeof(uint64_t);
-            *(uint64_t*)pos = htonll(it_order->symbol);
+            *(uint64_t*)pos = htonll(op->symbol);
             pos += sizeof(uint64_t);
-            *(uint8_t*)pos = it_order->side;
+            *(uint8_t*)pos = op->side;
             pos += sizeof(uint8_t);
-            *(int32_t*)pos = htonl(it_order->price_c);
+            *(int32_t*)pos = htonl(op->price_c);
             pos += sizeof(int32_t);
-            *(uint32_t*)pos = htonl(it_order->qty);
+            *(uint32_t*)pos = htonl(op->qty);
             pos += sizeof(uint32_t);
 
             // NOTE this will be 25
             int bytes_buffered = (int)(pos - buffer);
             int p = write(socket, buffer, bytes_buffered);
             if (p > 0) {
-                cutoff_ns = it_order->timestamp;
+                last_send_ns = op->timestamp;
             } else {
                 printf("ERROR could not send order\n");
             }
         }
-
-        orders_.erase(remove_if(orders_.begin(), orders_.end(), [cutoff_ns](Order &o) { return o.timestamp <= cutoff_ns; }), orders_.end());
 
         usleep(50000);
     }

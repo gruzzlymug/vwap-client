@@ -31,6 +31,11 @@ class Arc {
     static uint16_t t_first;
     static uint16_t t_next;
 
+    static const int max_orders = 32;
+    static Order all_orders[max_orders * 2];
+    static uint16_t o_first;
+    static uint16_t o_next;
+
     static int stream_market_data(int socket);
     static int calc_vwap();
     static int send_order_data(int socket);
