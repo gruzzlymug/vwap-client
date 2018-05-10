@@ -1,6 +1,7 @@
 #pragma once
 #include "market_types.h"
 
+#include <atomic>
 #include <vector>
 
 struct ArcConfig {
@@ -17,16 +18,19 @@ struct ArcConfig {
 };
 
 class Arc {
+    enum class State { INIT, RUN, QUIT };
+
     static ArcConfig config_;
-    static bool initializing_;
     static struct sockaddr_in serv_addr_;
     static int64_t vwap_;
+    static std::atomic<State> state_;
     static std::vector<Trade> trades_;
     static std::vector<Order> orders_;
 
     static int stream_market_data(int socket);
     static int calc_vwap();
     static int send_order_data(int socket);
+    static int handle_kb();
 
     static int connect(char *hostname, int port);
     static int read_bytes(int socket, unsigned int num_to_read, char *buffer);
