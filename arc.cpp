@@ -23,11 +23,11 @@ using namespace std;
 using namespace std::chrono;
 
 ArcConfig Arc::config_;
-bool Arc::initializing_ = true;
+atomic<Arc::State> Arc::state_ {Arc::State::INIT};
 struct sockaddr_in Arc::serv_addr_;
 int64_t Arc::vwap_ = 0;
-std::vector<Trade> Arc::trades_;
-std::vector<Order> Arc::orders_;
+vector<Trade> Arc::trades_;
+vector<Order> Arc::orders_;
 
 Arc::Arc() {
 }
@@ -42,12 +42,14 @@ int Arc::start(ArcConfig *new_config) {
 
     int market_socket = connect(config_.market_server_ip, config_.market_server_port);
     int order_socket = connect(config_.order_server_ip, config_.order_server_port);
-    std::thread t1(stream_market_data, market_socket);
-    std::thread t2(send_order_data, order_socket);
-    std::thread t3(calc_vwap);
-    t3.join();
-    t2.join();
+    thread t1(stream_market_data, market_socket);
+    thread t2(send_order_data, order_socket);
+    thread t3(calc_vwap);
+    thread t4(handle_kb);
     t1.join();
+    t2.join();
+    t3.join();
+    t4.join();
     close(order_socket);
     close(market_socket);
     return 0;
@@ -59,7 +61,7 @@ int Arc::stream_market_data(int socket) {
     uint64_t last_order_ns = 0;
     uint64_t order_timeout_ns = config_.order_timeout_s * 1000000000;
 
-    while (true) {
+    while (state_ != Arc::State::QUIT) {
         read_bytes(socket, 2, buffer);
         unsigned int length = (unsigned char) buffer[0];
         unsigned int message_type = (unsigned char) buffer[1];
@@ -84,18 +86,18 @@ int Arc::stream_market_data(int socket) {
 
             uint64_t now_ns = duration_cast<nanoseconds>(high_resolution_clock::now().time_since_epoch()).count();
             bool order_timeout_expired = now_ns > (last_order_ns + order_timeout_ns);
-            bool can_order = !initializing_ && order_timeout_expired;
+            bool can_order = state_ == Arc::State::RUN && order_timeout_expired;
             if (!order_timeout_expired) {
-                printf(".....\n");
+                //printf(".....\n");
             }
             if (can_order && strncmp((char *)&quote.symbol, config_.symbol, strlen(config_.symbol)) == 0) {
-                printf("q> %" PRIx64 " %7s $%8d x %3d, $%8d x %3d\n", quote.timestamp, (char *)&quote.symbol, quote.bid_price_c, quote.bid_qty, quote.ask_price_c, quote.ask_qty);
+                //printf("q> %" PRIx64 " %7s $%8d x %3d, $%8d x %3d\n", quote.timestamp, (char *)&quote.symbol, quote.bid_price_c, quote.bid_qty, quote.ask_price_c, quote.ask_qty);
                 char action = 'X';
                 if (config_.side == 'B' && (quote.ask_price_c * 100 <= vwap_)) {
-                    printf("BUY: %" PRIi64 "\n", (vwap_ - quote.ask_price_c * 100));
+                    //printf("BUY: %" PRIi64 "\n", (vwap_ - quote.ask_price_c * 100));
                     action = config_.side;
                 } else if (config_.side == 'S' && (quote.bid_price_c * 100 >= vwap_)) {
-                    printf("SELL: %" PRIi64 "\n", (vwap_ - quote.bid_price_c * 100));
+                    //printf("SELL: %" PRIi64 "\n", (vwap_ - quote.bid_price_c * 100));
                     action = config_.side;
                 }
                 if (action != 'X') {
@@ -148,7 +150,7 @@ int Arc::calc_vwap() {
     uint64_t earliest_ns = 0;
 
     printf("INITIALIZING\n");
-    while (initializing_) {
+    while (state_ == Arc::State::INIT) {
         usleep(500);
         if (earliest_ns == 0) {
             if (trades_.size() > 0) {
@@ -172,12 +174,12 @@ int Arc::calc_vwap() {
             }
             vwap_ = total_spent / total_contracts;
             printf("1> %" PRIx64 " %" PRIx64 " %7s %8d %4d\n", earliest_ns, t.timestamp, (char *)&t.symbol, t.price_c, t.qty);
-            initializing_ = false;
+            state_ = Arc::State::RUN;
         }
     }
 
     printf("READY\n");
-    while (true) {
+    while (state_ != Arc::State::QUIT) {
         uint64_t now_ns = duration_cast<nanoseconds>(high_resolution_clock::now().time_since_epoch()).count();
         int64_t total_spent = 0;
         int64_t total_contracts = 0;
@@ -196,7 +198,7 @@ int Arc::calc_vwap() {
         }
         printf("vwap = %" PRIu64 "\n", vwap_);
 
-        trades_.erase(std::remove_if(trades_.begin(), trades_.end(), [cutoff_ns](Trade &t) { return t.timestamp < cutoff_ns; }), trades_.end());
+        trades_.erase(remove_if(trades_.begin(), trades_.end(), [cutoff_ns](Trade &t) { return t.timestamp < cutoff_ns; }), trades_.end());
 
         usleep(500000);
     }
@@ -208,13 +210,13 @@ int Arc::send_order_data(int socket) {
     bzero(buffer, 25);
 
     uint64_t cutoff_ns = 0;
-    while (true) {
+    while (state_ != Arc::State::QUIT) {
         for (auto it_order = orders_.rbegin(); it_order != orders_.rend(); ++it_order) {
             if (it_order->timestamp <= cutoff_ns) {
                 continue;
             }
 
-            printf(">> %" PRIx64 " %7s %c $%d x %d\n", it_order->timestamp, (char *)&it_order->symbol, it_order->side, it_order->price_c, it_order->qty);
+            //printf(">> %" PRIx64 " %7s %c $%d x %d\n", it_order->timestamp, (char *)&it_order->symbol, it_order->side, it_order->price_c, it_order->qty);
 
             char buffer[25];
             char *pos = buffer;
@@ -239,9 +241,21 @@ int Arc::send_order_data(int socket) {
             }
         }
 
-        orders_.erase(std::remove_if(orders_.begin(), orders_.end(), [cutoff_ns](Order &o) { return o.timestamp <= cutoff_ns; }), orders_.end());
+        orders_.erase(remove_if(orders_.begin(), orders_.end(), [cutoff_ns](Order &o) { return o.timestamp <= cutoff_ns; }), orders_.end());
 
         usleep(50000);
+    }
+    return 0;
+}
+
+int Arc::handle_kb() {
+    while (state_ != Arc::State::QUIT) {
+        printf("start\n");
+        char c = getchar();
+        if (c == 'q' || c == 'Q') {
+            printf("QUITTING\n");
+            state_ = Arc::State::QUIT;
+        }
     }
     return 0;
 }
