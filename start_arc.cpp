@@ -24,7 +24,7 @@ int main(int argc, char** argv) {
     config.order_server_port = atoi(argv[3]);
 
     Arc arc;
-    arc.start(&config);
+    arc.run(&config);
 
     return 0;
 }

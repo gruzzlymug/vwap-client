@@ -16,7 +16,7 @@
 #elif __linux__
 #include "ntohll.cpp"
 #else
-#pragma message "UNKNOWN COMPILER"
+#pragma message "UNKNOWN PLATFORM"
 #endif
 
 using namespace std;
@@ -37,7 +37,8 @@ Order Arc::all_orders[2 * max_orders];
 uint16_t Arc::o_first = 0;
 uint16_t Arc::o_next = 0;
 
-uint64_t last_send_ns = 0;
+uint64_t Arc::last_order_ns = 0;
+uint64_t Arc::last_send_ns = 0;
 
 Arc::Arc() {
 }
@@ -45,7 +46,7 @@ Arc::Arc() {
 Arc::~Arc() {
 }
 
-int Arc::start(ArcConfig *config) {
+int Arc::run(ArcConfig *config) {
     // printf("%llx:%llx\n",
     //     (unsigned long long)all_trades,
     //     (unsigned long long)(all_trades + (2 * max_trades - 1)));
@@ -71,131 +72,140 @@ int Arc::start(ArcConfig *config) {
 int Arc::stream_market_data(int socket) {
     char buffer[256];
     bzero(buffer, 256);
-    uint64_t last_order_ns = 0;
-    uint64_t order_timeout_ns = config_.order_timeout_s * 1000000000;
 
     while (state_ != Arc::State::QUIT) {
         read_bytes(socket, 2, buffer);
         unsigned int length = (unsigned char) buffer[0];
         unsigned int message_type = (unsigned char) buffer[1];
+        read_bytes(socket, length, buffer);
         //printf("-> %d %d\n", length, message_type);
-        uint64_t now_ns = duration_cast<nanoseconds>(high_resolution_clock::now().time_since_epoch()).count();
         switch (message_type) {
         case 1: {
-            Quote quote;
-            read_bytes(socket, length, buffer);
-            char *pos = buffer;
-            quote.timestamp = ntohll(*(uint64_t*)pos);
-            pos += sizeof(uint64_t);
-            quote.symbol = ntohll(*(uint64_t*)pos);
-            pos += sizeof(uint64_t);
-            quote.bid_price_c = ntohl(*(int32_t*)pos);
-            pos += sizeof(int32_t);
-            quote.bid_qty = ntohl(*(uint32_t*)pos);
-            pos += sizeof(uint32_t);
-            quote.ask_price_c = ntohl(*(int32_t*)pos);
-            pos += sizeof(int32_t);
-            quote.ask_qty = ntohl(*(uint32_t*)pos);
-            pos += sizeof(uint32_t);
-
-            bool order_timeout_expired = now_ns > (last_order_ns + order_timeout_ns);
-            bool can_order = state_ == Arc::State::RUN && order_timeout_expired;
-            if (!order_timeout_expired) {
-                //printf(".....\n");
-            }
-            if (can_order && strncmp((char *)&quote.symbol, config_.symbol, strlen(config_.symbol)) == 0) {
-                //printf("q> %" PRIx64 " %7s $%8d x %3d, $%8d x %3d\n", quote.timestamp, (char *)&quote.symbol, quote.bid_price_c, quote.bid_qty, quote.ask_price_c, quote.ask_qty);
-                char action = 'X';
-                if (config_.side == 'B' && (quote.ask_price_c * 100 <= vwap_)) {
-                    //printf("BUY: %" PRIi64 "\n", (vwap_ - quote.ask_price_c * 100));
-                    action = config_.side;
-                } else if (config_.side == 'S' && (quote.bid_price_c * 100 >= vwap_)) {
-                    //printf("SELL: %" PRIi64 "\n", (vwap_ - quote.bid_price_c * 100));
-                    action = config_.side;
-                }
-                if (action != 'X') {
-                    for (uint16_t idx_order = o_first; idx_order < o_next; ++idx_order) {
-                        Order *op = (Order *)(all_orders + idx_order);
-                        if (op->timestamp <= last_send_ns) {
-                            ++o_first;
-                        }
-                    }
-
-                    if (o_first > max_orders) {
-                        // TODO bug if o_next wraps before copy
-                        memcpy(all_orders, all_orders + o_first, (o_next - o_first) * sizeof(Order));
-                        o_next -= o_first;
-                        o_first = 0;
-                    }
-
-                    void *vp = all_orders + o_next;
-                    Order *op = new(vp) Order;
-                    op->timestamp = quote.timestamp;
-                    op->symbol = quote.symbol;
-                    op->side = action;
-                    if (action == 'B') {
-                        op->price_c = quote.ask_price_c;
-                        op->qty = min(config_.qty_max, quote.ask_qty);
-                    } else {
-                        op->price_c = quote.bid_price_c;
-                        op->qty = min(config_.qty_max, quote.bid_qty);
-                    }
-                    last_order_ns = now_ns;
-
-                    ++o_next;
-                    o_next %= (max_orders * 2);
-                }
-            }
+            stream_quote(buffer, length);
             break;
         }
         case 2: {
-            read_bytes(socket, length, buffer);
-            char *pos = buffer;
-            uint64_t timestamp = ntohll(*(uint64_t*)pos);
-            pos += sizeof(uint64_t);
-            uint64_t symbol = ntohll(*(uint64_t*)pos);
-            pos += sizeof(uint64_t);
-            int32_t price_c = ntohl(*(int32_t*)pos);
-            pos += sizeof(int32_t);
-            uint32_t qty = ntohl(*(uint32_t*)pos);
-            pos += sizeof(uint32_t);
-
-            // TODO precalculate and remove duplication
-            uint64_t period_ns = config_.vwap_period_s * 1000000000;
-            uint64_t cutoff_ns = now_ns - period_ns;
-            for (uint16_t idx_trade = t_first; idx_trade < t_next; ++idx_trade) {
-                Trade *tp = (Trade *)(all_trades + idx_trade);
-                if (tp->timestamp < cutoff_ns) {
-                    ++t_first;
-                }
-            }
-
-            if (t_first > max_trades) {
-                // TODO bug if t_next wraps before copy
-                memcpy(all_trades, all_trades + t_first, (t_next - t_first) * sizeof(Trade));
-                t_next -= t_first;
-                t_first = 0;
-            }
-
-            if (strncmp((const char *)&symbol, config_.symbol, strlen(config_.symbol)) == 0) {
-                void *vp = all_trades + t_next;
-                // printf("%4d %llx\n", (int) t_next, (unsigned long long) vp);
-                Trade *tp = new(vp) Trade;
-                tp->timestamp = timestamp;
-                tp->symbol = symbol;
-                tp->price_c = price_c;
-                tp->qty = qty;
-                // printf("t> %" PRIx64 " %7s $%8d x %3d\n", tp->timestamp, (const char *)&tp->symbol, tp->price_c, tp->qty);
-
-                ++t_next;
-                t_next %= (max_trades * 2);
-            }
-
+            stream_trade(buffer, length);
             break;
         }
         default:
             printf("PROBLEM\n");
         }
+    }
+    return 0;
+}
+
+int Arc::stream_quote(char *buffer, size_t length) {
+    Quote quote;
+    char *pos = buffer;
+    quote.timestamp = ntohll(*(uint64_t*)pos);
+    pos += sizeof(uint64_t);
+    quote.symbol = ntohll(*(uint64_t*)pos);
+    pos += sizeof(uint64_t);
+    quote.bid_price_c = ntohl(*(int32_t*)pos);
+    pos += sizeof(int32_t);
+    quote.bid_qty = ntohl(*(uint32_t*)pos);
+    pos += sizeof(uint32_t);
+    quote.ask_price_c = ntohl(*(int32_t*)pos);
+    pos += sizeof(int32_t);
+    quote.ask_qty = ntohl(*(uint32_t*)pos);
+    pos += sizeof(uint32_t);
+
+    uint64_t now_ns = duration_cast<nanoseconds>(high_resolution_clock::now().time_since_epoch()).count();
+    uint64_t order_timeout_ns = config_.order_timeout_s * 1000000000;
+    bool order_timeout_expired = now_ns > (last_order_ns + order_timeout_ns);
+    bool can_order = state_ == Arc::State::RUN && order_timeout_expired;
+    if (!order_timeout_expired) {
+        //printf(".....\n");
+    }
+    if (can_order && strncmp((char *)&quote.symbol, config_.symbol, strlen(config_.symbol)) == 0) {
+        //printf("q> %" PRIx64 " %7s $%8d x %3d, $%8d x %3d\n", quote.timestamp, (char *)&quote.symbol, quote.bid_price_c, quote.bid_qty, quote.ask_price_c, quote.ask_qty);
+        char action = 'X';
+        if (config_.side == 'B' && (quote.ask_price_c * 100 <= vwap_)) {
+            //printf("BUY: %" PRIi64 "\n", (vwap_ - quote.ask_price_c * 100));
+            action = config_.side;
+        } else if (config_.side == 'S' && (quote.bid_price_c * 100 >= vwap_)) {
+            //printf("SELL: %" PRIi64 "\n", (vwap_ - quote.bid_price_c * 100));
+            action = config_.side;
+        }
+        if (action != 'X') {
+            for (uint16_t idx_order = o_first; idx_order < o_next; ++idx_order) {
+                Order *op = (Order *)(all_orders + idx_order);
+                if (op->timestamp <= last_send_ns) {
+                    ++o_first;
+                }
+            }
+
+            if (o_first > max_orders) {
+                // TODO bug if o_next wraps before copy
+                // TODO bug if moved while being read
+                memcpy(all_orders, all_orders + o_first, (o_next - o_first) * sizeof(Order));
+                o_next -= o_first;
+                o_first = 0;
+            }
+
+            void *vp = all_orders + o_next;
+            Order *op = new(vp) Order;
+            op->timestamp = quote.timestamp;
+            op->symbol = quote.symbol;
+            op->side = action;
+            if (action == 'B') {
+                op->price_c = quote.ask_price_c;
+                op->qty = min(config_.qty_max, quote.ask_qty);
+            } else {
+                op->price_c = quote.bid_price_c;
+                op->qty = min(config_.qty_max, quote.bid_qty);
+            }
+            last_order_ns = now_ns;
+
+            ++o_next;
+            o_next %= (max_orders * 2);
+        }
+    }
+    return 0;
+}
+
+int Arc::stream_trade(char *buffer, size_t length) {
+    char *pos = buffer;
+    uint64_t timestamp = ntohll(*(uint64_t*)pos);
+    pos += sizeof(uint64_t);
+    uint64_t symbol = ntohll(*(uint64_t*)pos);
+    pos += sizeof(uint64_t);
+    int32_t price_c = ntohl(*(int32_t*)pos);
+    pos += sizeof(int32_t);
+    uint32_t qty = ntohl(*(uint32_t*)pos);
+    pos += sizeof(uint32_t);
+
+    // TODO precalculate period_ns and remove duplication
+    uint64_t now_ns = duration_cast<nanoseconds>(high_resolution_clock::now().time_since_epoch()).count();
+    uint64_t period_ns = config_.vwap_period_s * 1000000000;
+    uint64_t cutoff_ns = now_ns - period_ns;
+    for (uint16_t idx_trade = t_first; idx_trade < t_next; ++idx_trade) {
+        Trade *tp = (Trade *)(all_trades + idx_trade);
+        if (tp->timestamp < cutoff_ns) {
+            ++t_first;
+        }
+    }
+
+    if (t_first > max_trades) {
+        // TODO bug if t_next wraps before copy
+        memcpy(all_trades, all_trades + t_first, (t_next - t_first) * sizeof(Trade));
+        t_next -= t_first;
+        t_first = 0;
+    }
+
+    if (strncmp((const char *)&symbol, config_.symbol, strlen(config_.symbol)) == 0) {
+        void *vp = all_trades + t_next;
+        // printf("%4d %llx\n", (int) t_next, (unsigned long long) vp);
+        Trade *tp = new(vp) Trade;
+        tp->timestamp = timestamp;
+        tp->symbol = symbol;
+        tp->price_c = price_c;
+        tp->qty = qty;
+        // printf("t> %" PRIx64 " %7s $%8d x %3d\n", tp->timestamp, (const char *)&tp->symbol, tp->price_c, tp->qty);
+
+        ++t_next;
+        t_next %= (max_trades * 2);
     }
     return 0;
 }

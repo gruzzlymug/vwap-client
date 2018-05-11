@@ -24,7 +24,6 @@ class Arc {
     static struct sockaddr_in serv_addr_;
     static int64_t vwap_;
     static std::atomic<State> state_;
-    static std::vector<Order> orders_;
 
     static const int max_trades = 32;
     static Trade all_trades[max_trades * 2];
@@ -36,7 +35,13 @@ class Arc {
     static uint16_t o_first;
     static uint16_t o_next;
 
+    static uint64_t last_order_ns;
+    static uint64_t last_send_ns;
+
     static int stream_market_data(int socket);
+    static int stream_quote(char *buffer, size_t length);
+    static int stream_trade(char *buffer, size_t length);
+
     static int calc_vwap();
     static int send_order_data(int socket);
     static int handle_kb();
@@ -47,5 +52,5 @@ class Arc {
 public:
     Arc();
     ~Arc();
-    int start(ArcConfig *config);
+    int run(ArcConfig *config);
 };
