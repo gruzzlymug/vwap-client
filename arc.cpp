@@ -38,8 +38,7 @@ uint16_t Arc::o_first = 0;
 uint16_t Arc::o_next = 0;
 
 uint64_t Arc::last_order_ns = 0;
-
-uint64_t last_send_ns = 0;
+uint64_t Arc::last_send_ns = 0;
 
 Arc::Arc() {
 }
@@ -47,7 +46,7 @@ Arc::Arc() {
 Arc::~Arc() {
 }
 
-int Arc::start(ArcConfig *config) {
+int Arc::run(ArcConfig *config) {
     // printf("%llx:%llx\n",
     //     (unsigned long long)all_trades,
     //     (unsigned long long)(all_trades + (2 * max_trades - 1)));

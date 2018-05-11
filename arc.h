@@ -36,6 +36,7 @@ class Arc {
     static uint16_t o_next;
 
     static uint64_t last_order_ns;
+    static uint64_t last_send_ns;
 
     static int stream_market_data(int socket);
     static int stream_quote(char *buffer, size_t length);
@@ -51,5 +52,5 @@ class Arc {
 public:
     Arc();
     ~Arc();
-    int start(ArcConfig *config);
+    int run(ArcConfig *config);
 };
