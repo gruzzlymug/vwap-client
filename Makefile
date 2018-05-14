@@ -3,9 +3,9 @@ CFLAGS=-g -c -Wall -std=c++14
 LDFLAGS=
 # for Linux
 # LDFLAGS=-pthread
-CLIENT_SOURCES=start_arc.cpp arc.cpp
+CLIENT_SOURCES=start_starc.cpp starc.cpp arc.cpp
 CLIENT_OBJECTS=$(CLIENT_SOURCES:.cpp=.o)
-CLIENT_EXECUTABLE=start_arc
+CLIENT_EXECUTABLE=start_starc
 
 SERVER_SOURCES=start_server.cpp server.cpp
 SERVER_OBJECTS=$(SERVER_SOURCES:.cpp=.o)

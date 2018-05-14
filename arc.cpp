@@ -37,8 +37,8 @@ Order Arc::all_orders[2 * max_orders];
 uint16_t Arc::o_first = 0;
 uint16_t Arc::o_next = 0;
 
-uint64_t Arc::last_order_ns = 0;
-uint64_t Arc::last_send_ns = 0;
+uint64_t Arc::last_order_ns_ = 0;
+uint64_t Arc::last_send_ns_ = 0;
 
 Arc::Arc() {
 }
@@ -113,7 +113,7 @@ int Arc::stream_quote(char *buffer, size_t length) {
 
     uint64_t now_ns = duration_cast<nanoseconds>(high_resolution_clock::now().time_since_epoch()).count();
     uint64_t order_timeout_ns = config_.order_timeout_s * 1000000000;
-    bool order_timeout_expired = now_ns > (last_order_ns + order_timeout_ns);
+    bool order_timeout_expired = now_ns > (last_order_ns_ + order_timeout_ns);
     bool can_order = state_ == Arc::State::RUN && order_timeout_expired;
     if (!order_timeout_expired) {
         //printf(".....\n");
@@ -131,7 +131,7 @@ int Arc::stream_quote(char *buffer, size_t length) {
         if (action != 'X') {
             for (uint16_t idx_order = o_first; idx_order < o_next; ++idx_order) {
                 Order *op = (Order *)(all_orders + idx_order);
-                if (op->timestamp <= last_send_ns) {
+                if (op->timestamp <= last_send_ns_) {
                     ++o_first;
                 }
             }
@@ -156,7 +156,7 @@ int Arc::stream_quote(char *buffer, size_t length) {
                 op->price_c = quote.bid_price_c;
                 op->qty = min(config_.qty_max, quote.bid_qty);
             }
-            last_order_ns = now_ns;
+            last_order_ns_ = now_ns;
 
             ++o_next;
             o_next %= (max_orders * 2);
@@ -275,7 +275,7 @@ int Arc::send_order_data(int socket) {
     while (state_ != Arc::State::QUIT) {
         for (uint16_t idx_order = o_first; idx_order < o_next; ++idx_order) {
             Order *op = (Order *)(all_orders + idx_order);
-            if (op->timestamp <= last_send_ns) {
+            if (op->timestamp <= last_send_ns_) {
                 continue;
             }
 
@@ -298,7 +298,7 @@ int Arc::send_order_data(int socket) {
             int bytes_buffered = (int)(pos - buffer);
             int p = write(socket, buffer, bytes_buffered);
             if (p > 0) {
-                last_send_ns = op->timestamp;
+                last_send_ns_ = op->timestamp;
             } else {
                 printf("ERROR could not send order\n");
             }
