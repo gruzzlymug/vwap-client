@@ -1,21 +1,8 @@
 #pragma once
+#include "arc_config.h"
 #include "market_types.h"
 
 #include <atomic>
-#include <vector>
-
-struct ArcConfig {
-    char symbol[8];
-    char side;
-    unsigned int qty_max;
-    unsigned int vwap_period_s;
-    unsigned int order_timeout_s;
-    // TODO: unify ip:port
-    char market_server_ip[32];
-    unsigned int market_server_port;
-    char order_server_ip[32];
-    unsigned int order_server_port;
-};
 
 class Arc {
     enum class State { INIT, RUN, QUIT };
@@ -35,8 +22,8 @@ class Arc {
     static uint16_t o_first;
     static uint16_t o_next;
 
-    static uint64_t last_order_ns;
-    static uint64_t last_send_ns;
+    static uint64_t last_order_ns_;
+    static uint64_t last_send_ns_;
 
     static int stream_market_data(int socket);
     static int stream_quote(char *buffer, size_t length);

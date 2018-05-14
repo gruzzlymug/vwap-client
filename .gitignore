@@ -1,6 +1,7 @@
 .vscode
 gmon.out
 start_arc
+start_starc
 start_client
 start_server
 **/*.o
