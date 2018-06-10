@@ -139,7 +139,7 @@ int Arc::stream_quote(char *buffer, size_t length) {
             if (o_first > max_orders) {
                 // TODO bug if o_next wraps before copy
                 // TODO bug if moved while being read
-                memcpy(all_orders, all_orders + o_first, (o_next - o_first) * sizeof(Order));
+                memmove(all_orders, all_orders + o_first, (o_next - o_first) * sizeof(Order));
                 o_next -= o_first;
                 o_first = 0;
             }
@@ -189,7 +189,7 @@ int Arc::stream_trade(char *buffer, size_t length) {
 
     if (t_first > max_trades) {
         // TODO bug if t_next wraps before copy
-        memcpy(all_trades, all_trades + t_first, (t_next - t_first) * sizeof(Trade));
+        memmove(all_trades, all_trades + t_first, (t_next - t_first) * sizeof(Trade));
         t_next -= t_first;
         t_first = 0;
     }

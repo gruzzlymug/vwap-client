@@ -214,7 +214,7 @@ void Starc::trim_trades() {
             perror("ERROR trade array full");
             exit(1);
         }
-        memcpy(all_trades_, all_trades_ + t_first_, (t_next_ - t_first_) * sizeof(Trade));
+        memmove(all_trades_, all_trades_ + t_first_, (t_next_ - t_first_) * sizeof(Trade));
         t_next_ -= t_first_;
         t_first_ = 0;
     }
