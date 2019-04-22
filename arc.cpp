@@ -12,13 +12,6 @@
 #define __STDC_FORMAT_MACROS
 #include <inttypes.h>
 
-#ifdef __APPLE__
-#elif __linux__
-#include "ntohll.cpp"
-#else
-#pragma message "UNKNOWN PLATFORM"
-#endif
-
 using namespace std;
 using namespace std::chrono;
 
@@ -95,12 +88,13 @@ int Arc::stream_market_data(int socket) {
     return 0;
 }
 
+// TODO deal with byte order
 int Arc::stream_quote(char *buffer, size_t length) {
     Quote quote;
     char *pos = buffer;
-    quote.timestamp = ntohll(*(uint64_t*)pos);
+    quote.timestamp = (*(uint64_t*)pos);
     pos += sizeof(uint64_t);
-    quote.symbol = ntohll(*(uint64_t*)pos);
+    quote.symbol = (*(uint64_t*)pos);
     pos += sizeof(uint64_t);
     quote.bid_price_c = ntohl(*(int32_t*)pos);
     pos += sizeof(int32_t);
@@ -165,11 +159,12 @@ int Arc::stream_quote(char *buffer, size_t length) {
     return 0;
 }
 
+// TODO deal with byte order
 int Arc::stream_trade(char *buffer, size_t length) {
     char *pos = buffer;
-    uint64_t timestamp = ntohll(*(uint64_t*)pos);
+    uint64_t timestamp = (*(uint64_t*)pos);
     pos += sizeof(uint64_t);
-    uint64_t symbol = ntohll(*(uint64_t*)pos);
+    uint64_t symbol = (*(uint64_t*)pos);
     pos += sizeof(uint64_t);
     int32_t price_c = ntohl(*(int32_t*)pos);
     pos += sizeof(int32_t);
@@ -283,9 +278,9 @@ int Arc::send_order_data(int socket) {
 
             char buffer[25];
             char *pos = buffer;
-            *(uint64_t*)pos = htonll(op->timestamp);
+            *(uint64_t*)pos = (op->timestamp);
             pos += sizeof(uint64_t);
-            *(uint64_t*)pos = htonll(op->symbol);
+            *(uint64_t*)pos = (op->symbol);
             pos += sizeof(uint64_t);
             *(uint8_t*)pos = op->side;
             pos += sizeof(uint8_t);

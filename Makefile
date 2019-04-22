@@ -1,8 +1,7 @@
 CC=g++
 CFLAGS=-g -c -Wall -std=c++14
-LDFLAGS=
-# for Linux
-# LDFLAGS=-pthread
+
+LDFLAGS=-pthread
 CLIENT_SOURCES=start_starc.cpp starc.cpp arc.cpp
 CLIENT_OBJECTS=$(CLIENT_SOURCES:.cpp=.o)
 CLIENT_EXECUTABLE=start_starc

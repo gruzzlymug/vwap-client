@@ -91,11 +91,12 @@ int Starc::stream_market_data(int market_socket, int order_socket) {
     return 0;
 }
 
+// TODO deal with byte ordering
 bool Starc::deserialize_quote(char *buffer, size_t length) {
     char *pos = buffer;
-    quote_.timestamp = ntohll(*(uint64_t*)pos);
+    quote_.timestamp = (*(uint64_t*)pos);
     pos += sizeof(uint64_t);
-    quote_.symbol = ntohll(*(uint64_t*)pos);
+    quote_.symbol = (*(uint64_t*)pos);
     pos += sizeof(uint64_t);
     quote_.bid_price_c = ntohl(*(int32_t*)pos);
     pos += sizeof(int32_t);
@@ -148,9 +149,9 @@ int Starc::place_order(int socket) {
 void Starc::serialize_order(int socket, const Order& order) {
     // printf(">> %" PRIx64 " %7s %c $%d x %d\n", order.timestamp, (char *)&order.symbol, order.side, order.price_c, order.qty);
     char *pos = buffer_;
-    *(uint64_t*)pos = htonll(order.timestamp);
+    *(uint64_t*)pos = (order.timestamp);
     pos += sizeof(uint64_t);
-    *(uint64_t*)pos = htonll(order.symbol);
+    *(uint64_t*)pos = (order.symbol);
     pos += sizeof(uint64_t);
     *(uint8_t*)pos = order.side;
     pos += sizeof(uint8_t);
@@ -170,9 +171,9 @@ void Starc::serialize_order(int socket, const Order& order) {
 
 bool Starc::deserialize_trade(char *buffer, size_t length) {
     char *pos = buffer;
-    uint64_t timestamp = ntohll(*(uint64_t*)pos);
+    uint64_t timestamp = (*(uint64_t*)pos);
     pos += sizeof(uint64_t);
-    uint64_t symbol = ntohll(*(uint64_t*)pos);
+    uint64_t symbol = (*(uint64_t*)pos);
     pos += sizeof(uint64_t);
     int32_t price_c = ntohl(*(int32_t*)pos);
     pos += sizeof(int32_t);
