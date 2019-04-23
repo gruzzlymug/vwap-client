@@ -1,6 +1,4 @@
 #include "starc.h"
-#include "arc_config.h"
-#include "market_types.h"
 
 #include <algorithm>
 #include <chrono>
