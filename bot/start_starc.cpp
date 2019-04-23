@@ -1,5 +1,5 @@
 #include "starc.h"
-#include "arc_config.h"
+#include "../common/bot_config.h"
 
 #include <stdio.h>
 #include <stdlib.h>

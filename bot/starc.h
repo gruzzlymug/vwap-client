@@ -1,6 +1,6 @@
 #pragma once
-#include "arc_config.h"
-#include "market_types.h"
+#include "../common/bot_config.h"
+#include "../common/market_types.h"
 
 #include <atomic>
 

@@ -13,13 +13,6 @@
 #define __STDC_FORMAT_MACROS
 #include <inttypes.h>
 
-#ifdef __APPLE__
-#elif __linux__
-#include "ntohll.cpp"
-#else
-#pragma message "UNKNOWN COMPILER"
-#endif
-
 using namespace std::chrono;
 
 Server::Server(int mode)
@@ -126,6 +119,7 @@ int Server::read_bytes(int socket, unsigned int num_to_read, char *buffer) {
     return 0;
 }
 
+// TODO deal with byte order
 void Server::send_quote(int socket) {
     std::random_device rd;
     std::mt19937 gen(rd());
@@ -163,9 +157,9 @@ void Server::send_quote(int socket) {
     }
 
     char *pos = buffer;
-    *(uint64_t*)pos = htonll(quote.timestamp);
+    *(uint64_t*)pos = (quote.timestamp);
     pos += sizeof(uint64_t);
-    *(uint64_t*)pos = htonll(quote.symbol);
+    *(uint64_t*)pos = (quote.symbol);
     pos += sizeof(uint64_t);
     *(int32_t*)pos = htonl(quote.bid_price_c);
     pos += sizeof(int32_t);
@@ -181,6 +175,7 @@ void Server::send_quote(int socket) {
     }
 }
 
+// TODO deal with byte order
 void Server::send_trade(int socket) {
     std::random_device rd;
     std::mt19937 gen(rd());
@@ -224,9 +219,9 @@ void Server::send_trade(int socket) {
     // TODO: clean up buffer use
     char buffer[sizeof(trade)];
     char *pos = buffer;
-    *(uint64_t*)pos = htonll(trade.timestamp);
+    *(uint64_t*)pos = (trade.timestamp);
     pos += sizeof(uint64_t);
-    *(uint64_t*)pos = htonll(trade.symbol);
+    *(uint64_t*)pos = (trade.symbol);
     pos += sizeof(uint64_t);
     *(int32_t*)pos = htonl(trade.price_c);
     pos += sizeof(int32_t);
@@ -239,6 +234,7 @@ void Server::send_trade(int socket) {
     }
 }
 
+// TODO deal with byte order
 void Server::accept_orders(int socket) {
     char buffer[256];
     Order order;
@@ -251,9 +247,9 @@ void Server::accept_orders(int socket) {
         if (n == 0) {
             char *pos = buffer;
 
-            order.timestamp = ntohll(*(uint64_t*)pos);
+            order.timestamp = (*(uint64_t*)pos);
             pos += sizeof(uint64_t);
-            order.symbol = ntohll(*(uint64_t*)pos);
+            order.symbol = (*(uint64_t*)pos);
             pos += sizeof(uint64_t);
             order.side = *(uint8_t*)pos;
             pos += sizeof(uint8_t);
