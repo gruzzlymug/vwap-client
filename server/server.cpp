@@ -13,8 +13,6 @@
 #define __STDC_FORMAT_MACROS
 #include <inttypes.h>
 
-using namespace std::chrono;
-
 Server::Server(int mode)
     : sockfd(-1), mode(mode), done(false) {
     signal(SIGCHLD, SIG_IGN);
@@ -127,7 +125,7 @@ void Server::send_quote(int socket) {
     std::uniform_int_distribution<> contract_range(1, 13);
     std::uniform_int_distribution<> side_range(0, 1);
 
-    uint64_t now_ns = duration_cast<nanoseconds>(high_resolution_clock::now().time_since_epoch()).count();
+    uint64_t now_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now().time_since_epoch()).count();
 
     uint64_t now_s = now_ns / 1000000000;
     uint16_t offset = now_s % 6283;
@@ -183,7 +181,7 @@ void Server::send_trade(int socket) {
     std::uniform_int_distribution<> contract_range(1, 13);
     std::uniform_int_distribution<> symbol_range(0, 2);
 
-    uint64_t now_ns = duration_cast<nanoseconds>(high_resolution_clock::now().time_since_epoch()).count();
+    uint64_t now_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now().time_since_epoch()).count();
     Trade trade;
     trade.timestamp = now_ns;
     switch (symbol_range(gen)) {

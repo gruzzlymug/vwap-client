@@ -12,11 +12,8 @@
 #define __STDC_FORMAT_MACROS
 #include <inttypes.h>
 
-using namespace std;
-using namespace std::chrono;
-
 ArcConfig Arc::config_;
-atomic<Arc::State> Arc::state_ {Arc::State::INIT};
+std::atomic<Arc::State> Arc::state_ {Arc::State::INIT};
 struct sockaddr_in Arc::serv_addr_;
 int64_t Arc::vwap_ = 0;
 
@@ -49,10 +46,10 @@ int Arc::run(ArcConfig *config) {
 
     int market_socket = connect(config_.market_server_ip, config_.market_server_port);
     int order_socket = connect(config_.order_server_ip, config_.order_server_port);
-    thread t1(stream_market_data, market_socket);
-    thread t2(send_order_data, order_socket);
-    thread t3(calc_vwap);
-    thread t4(handle_kb);
+    std::thread t1(stream_market_data, market_socket);
+    std::thread t2(send_order_data, order_socket);
+    std::thread t3(calc_vwap);
+    std::thread t4(handle_kb);
     t1.join();
     t2.join();
     t3.join();
@@ -105,7 +102,7 @@ int Arc::stream_quote(char *buffer, size_t length) {
     quote.ask_qty = ntohl(*(uint32_t*)pos);
     pos += sizeof(uint32_t);
 
-    uint64_t now_ns = duration_cast<nanoseconds>(high_resolution_clock::now().time_since_epoch()).count();
+    uint64_t now_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now().time_since_epoch()).count();
     uint64_t order_timeout_ns = config_.order_timeout_s * 1000000000;
     bool order_timeout_expired = now_ns > (last_order_ns_ + order_timeout_ns);
     bool can_order = state_ == Arc::State::RUN && order_timeout_expired;
@@ -145,10 +142,10 @@ int Arc::stream_quote(char *buffer, size_t length) {
             op->side = action;
             if (action == 'B') {
                 op->price_c = quote.ask_price_c;
-                op->qty = min(config_.qty_max, quote.ask_qty);
+                op->qty = std::min(config_.qty_max, quote.ask_qty);
             } else {
                 op->price_c = quote.bid_price_c;
-                op->qty = min(config_.qty_max, quote.bid_qty);
+                op->qty = std::min(config_.qty_max, quote.bid_qty);
             }
             last_order_ns_ = now_ns;
 
@@ -172,7 +169,7 @@ int Arc::stream_trade(char *buffer, size_t length) {
     pos += sizeof(uint32_t);
 
     // TODO precalculate period_ns and remove duplication
-    uint64_t now_ns = duration_cast<nanoseconds>(high_resolution_clock::now().time_since_epoch()).count();
+    uint64_t now_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now().time_since_epoch()).count();
     uint64_t period_ns = config_.vwap_period_s * 1000000000;
     uint64_t cutoff_ns = now_ns - period_ns;
     for (uint16_t idx_trade = t_first; idx_trade < t_next; ++idx_trade) {
@@ -241,7 +238,7 @@ int Arc::calc_vwap() {
 
     printf("READY\n");
     while (state_ != Arc::State::QUIT) {
-        uint64_t now_ns = duration_cast<nanoseconds>(high_resolution_clock::now().time_since_epoch()).count();
+        uint64_t now_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now().time_since_epoch()).count();
         int64_t total_spent = 0;
         int64_t total_contracts = 0;
         uint64_t cutoff_ns = now_ns - period_ns;
