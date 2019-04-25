@@ -13,9 +13,6 @@
 #define __STDC_FORMAT_MACROS
 #include <inttypes.h>
 
-using namespace std;
-using namespace std::chrono;
-
 Starc::Starc() : state_(State::INIT), t_first_(0), t_next_(0) {
     memset(&quote_, 0, sizeof(quote_));
 }
@@ -112,7 +109,7 @@ bool Starc::deserialize_quote(char *buffer, size_t length) {
 }
 
 bool Starc::ready_to_order() {
-    uint64_t now_ns = duration_cast<nanoseconds>(high_resolution_clock::now().time_since_epoch()).count();
+    uint64_t now_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now().time_since_epoch()).count();
     uint64_t order_timeout_ns = config_.order_timeout_s * 1000000000;
     bool order_timeout_expired = now_ns > (last_order_ns_ + order_timeout_ns);
     bool can_order = state_ == Starc::State::RUN && order_timeout_expired;
@@ -135,10 +132,10 @@ int Starc::place_order(int socket) {
     order.side = config_.side;
     if (config_.side == 'B') {
         order.price_c = quote_.ask_price_c;
-        order.qty = min(config_.qty_max, quote_.ask_qty);
+        order.qty = std::min(config_.qty_max, quote_.ask_qty);
     } else {
         order.price_c = quote_.bid_price_c;
-        order.qty = min(config_.qty_max, quote_.bid_qty);
+        order.qty = std::min(config_.qty_max, quote_.bid_qty);
     }
     serialize_order(socket, order);
     return 0;
@@ -194,7 +191,7 @@ bool Starc::deserialize_trade(char *buffer, size_t length) {
 
 void Starc::trim_trades() {
     // TODO precalculate period_ns and remove duplication
-    uint64_t now_ns = duration_cast<nanoseconds>(high_resolution_clock::now().time_since_epoch()).count();
+    uint64_t now_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now().time_since_epoch()).count();
     uint64_t period_ns = config_.vwap_period_s * 1000000000;
     uint64_t cutoff_ns = now_ns - period_ns;
     for (uint16_t idx_trade = t_next_ - 1; idx_trade > t_first_; --idx_trade) {
