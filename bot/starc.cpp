@@ -1,4 +1,5 @@
 #include "starc.h"
+#include "../common/time_util.h"
 
 #include <algorithm>
 #include <chrono>
@@ -182,7 +183,10 @@ bool Starc::deserialize_trade(char *buffer, size_t length) {
         tp->symbol = symbol;
         tp->price_c = price_c;
         tp->qty = qty;
-        printf("t> %" PRIx64 " %7s $%8d x %3d\n", tp->timestamp, (const char *)&tp->symbol, tp->price_c, tp->qty);
+
+        printf("t> ");
+        output_time(tp->timestamp);
+        printf(" %7s $%8d x %3d\n", (const char *)&tp->symbol, tp->price_c, tp->qty);
         ++t_next_;
         return true;
     }
