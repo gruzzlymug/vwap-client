@@ -1,4 +1,5 @@
 #include "server.h"
+#include "../common/time_util.h"
 
 #include <chrono>
 #include <random>
@@ -119,13 +120,15 @@ int Server::read_bytes(int socket, unsigned int num_to_read, char *buffer) {
 
 // TODO deal with byte order
 void Server::send_quote(int socket) {
+    using clock = std::chrono::high_resolution_clock;
+
     std::random_device rd;
     std::mt19937 gen(rd());
     std::uniform_int_distribution<> price_range(-25, 25);
     std::uniform_int_distribution<> contract_range(1, 13);
     std::uniform_int_distribution<> side_range(0, 1);
 
-    uint64_t now_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now().time_since_epoch()).count();
+    uint64_t now_ns = clock::now().time_since_epoch().count();
 
     uint64_t now_s = now_ns / 1000000000;
     uint16_t offset = now_s % 6283;
@@ -175,13 +178,15 @@ void Server::send_quote(int socket) {
 
 // TODO deal with byte order
 void Server::send_trade(int socket) {
+    using clock = std::chrono::high_resolution_clock;
+
     std::random_device rd;
     std::mt19937 gen(rd());
     std::uniform_int_distribution<> price_range(-10, 10);
     std::uniform_int_distribution<> contract_range(1, 13);
     std::uniform_int_distribution<> symbol_range(0, 2);
 
-    uint64_t now_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::high_resolution_clock::now().time_since_epoch()).count();
+    uint64_t now_ns = clock::now().time_since_epoch().count();
     Trade trade;
     trade.timestamp = now_ns;
     switch (symbol_range(gen)) {
@@ -256,7 +261,9 @@ void Server::accept_orders(int socket) {
             order.qty = ntohl(*(int32_t*)pos);
             pos += sizeof(uint32_t);
 
-            printf("o> %" PRIx64 " %7s %c $%8d x %4d\n", order.timestamp, (char *)&order.symbol, order.side, order.price_c, order.qty);
+            printf("o> ");
+            output_time(order.timestamp);
+            printf(" %7s %c $%8d x %4d\n", (char *)&order.symbol, order.side, order.price_c, order.qty);
         }
     }
 }
